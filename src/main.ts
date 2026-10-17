@@ -20,6 +20,12 @@ function resize(){
   canvas.style.width=`${320*displayScale}px`;canvas.style.height=`${180*displayScale}px`;
 }
 function updateTouchUI(){
+  const musicButton=document.querySelector<HTMLButtonElement>('#sound')!;
+  musicButton.setAttribute('aria-label',game.sound.muted?'音楽を有効にする':`音楽をミュート（${game.sound.playing?'再生中':'開始待ち'}：${game.sound.track}）`);
+  musicButton.setAttribute('aria-pressed',String(!game.sound.muted));
+  musicButton.title=game.sound.track;
+  document.body.classList.toggle('is-playing',!['TITLE','SETTINGS'].includes(game.scene));
+  const modeButton=document.querySelector<HTMLButtonElement>('#puzzle-mode')!;modeButton.textContent=game.timed?'落ちもの':'思考モード';modeButton.title='自動落下なしの思考モード / 自動落下ありの落ちものを比較';
   const puzzle=game.scene==='PUZZLE'&&!game.pause&&!game.board.failed;
   document.querySelector<HTMLElement>('#touch-puzzle')!.hidden=!puzzle;
   document.querySelector<HTMLElement>('#touch-menu')!.hidden=puzzle;
@@ -41,7 +47,7 @@ function updateTouchUI(){
     const line=game.currentLine();caption=`${line.speaker}：${line.text.slice(0,Math.floor(game.typed))}`;
   }else if(game.scene==='QUESTION')caption=`質問 ${game.selected+1} / 3：${questions[game.selected]}`;
   else if(game.scene==='MEMORY'){const memory=memories[game.memory-1];caption=`${memory.title}：${memory.text} ${memory.detail}${game.memory===1?' 上司の声が現れ、叱責のおじゃまを2個増やした。':''}`;}
-  else if(game.scene==='PUZZLE')caption=game.board.failed?'脳内が飽和した。再挑戦できます。':game.hintTime>0?game.hintText:game.board.angerUnlocked?'橙の怒りを、右下の黒い核の隣に置こう。':`記憶の解放 ${game.board.diagnosed} / 6。灰色の塊の隣で同じ感情を4つ消し、封印→ひび→解放。普通の消去だけでは診断は進みません。`;
+  else if(game.scene==='PUZZLE')caption=game.board.failed?'脳内が飽和した。再挑戦できます。':game.hintTime>0?game.hintText:game.board.angerUnlocked?'橙の怒りを、右下の黒い核の隣に置こう。':`記憶の解放 ${game.board.diagnosed} / 6。${game.timed?'自動落下あり。':'時間制限なし。'}中央の封印を周囲からほどく。隣接消去2回で記憶を解放。`;
   else if(game.scene==='SETTINGS')caption='上下で項目を選び、決定で変更。音量は − / ＋。';
   else if(game.scene==='ROOM_INTRO')caption='患者が入室しています。決定で進めます。';
   else if(game.scene==='DIVE')caption='声の奥へ。決定で演出をスキップ。';
@@ -58,3 +64,10 @@ document.querySelector('#sound')!.addEventListener('click',()=>{game.toggleSound
 document.querySelector('#fullscreen')!.addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await consoleElement.requestFullscreen();}catch{/* Browser can decline fullscreen; the normal view remains playable. */}resize();canvas.focus();});
 document.querySelector('#help')!.addEventListener('click',()=>{const guide=document.querySelector<HTMLDetailsElement>('#guide')!;guide.open=!guide.open;if(guide.open)guide.scrollIntoView({behavior:'smooth',block:'nearest'});});
 canvas.focus({preventScroll:true});
+
+function startWithSound(muted:boolean){game.sound.unlock();game.sound.muted=muted;game.save();game.start();canvas.focus({preventScroll:true});requestAnimationFrame(()=>consoleElement.scrollIntoView({behavior:'smooth',block:'start'}));}
+document.querySelector('#play-music')!.addEventListener('click',()=>startWithSound(false));
+document.querySelector('#play-silent')!.addEventListener('click',()=>startWithSound(true));
+document.querySelector('#jump-game')!.addEventListener('click',()=>{consoleElement.scrollIntoView({behavior:'smooth',block:'start'});canvas.focus({preventScroll:true});});
+
+document.querySelector('#puzzle-mode')!.addEventListener('click',()=>{game.toggleMode();canvas.focus({preventScroll:true});});

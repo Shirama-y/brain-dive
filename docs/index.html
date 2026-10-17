@@ -1,14 +1,19 @@
 <!doctype html>
 <html lang="ja">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/><meta name="theme-color" content="#101115"/><meta name="description" content="混ざり合った声と記憶をほどく、短編心理パズル。BRAIN DIVE — 診断書"/><title>BRAIN DIVE — 診断書</title>  <script type="module" crossorigin src="./assets/index-LWBIc_lv.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-DgIYv8Sr.css">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/><meta name="theme-color" content="#101115"/><meta name="description" content="混ざり合った声と記憶をほどく、短編心理パズル。BRAIN DIVE — 診断書"/><title>BRAIN DIVE — 診断書</title>  <script type="module" crossorigin src="./assets/index-BAUi1gwD.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-CBbm9ep9.css">
 </head>
 <body>
 <div class="shell">
-<header><a class="brand" href="./" aria-label="BRAIN DIVE ホーム"><span class="brand-icon">◉</span> BRAIN DIVE<span class="brand-sub">INTERIOR CLINIC</span></a><div class="edition"><span class="status-dot"></span> PLAYABLE CASE <span class="edition-number">001</span></div></header>
+<header><a class="brand" href="./" aria-label="BRAIN DIVE ホーム"><span class="brand-icon">◉</span> BRAIN DIVE<span class="brand-sub">INTERIOR CLINIC</span></a><div class="edition"><span class="status-dot"></span> PLAYABLE CASE <span class="edition-number">001</span></div><button class="header-play" id="jump-game">PLAY ↗</button></header>
 <main>
-<div class="game-heading"><div><span class="eyebrow">A SHORT PSYCHOLOGICAL PUZZLE</span><h1>その声は、<span>あなたのものですか。</span></h1></div><div class="case-label">症例 01<span>月曜の朝</span></div></div>
-<section class="console" aria-label="BRAIN DIVE ゲーム"><div class="console-top"><span><i></i> <b id="scene-label">BRAIN DIVE / 待合室</b></span><span>320 × 180 <span class="top-divider">/</span> PIXEL CANVAS</span></div><div class="viewport" id="viewport"><canvas id="game" width="320" height="180" tabindex="0" aria-label="BRAIN DIVE。Enterで開始。矢印で移動、Xで回転、Spaceで落下。"></canvas><div class="scanlines" aria-hidden="true"></div></div><div id="touch-controls" class="touch-controls" aria-label="タッチ操作">
+<section class="hero" aria-label="BRAIN DIVE — 診断書">
+<img class="hero-art" src="./assets/brain-dive-keyvisual.png" alt="青年の横顔から神経と無数の目がほどける、夜の脳内風景" width="1536" height="864" fetchpriority="high"/>
+<div class="hero-copy"><span class="eyebrow">A SHORT PSYCHOLOGICAL PUZZLE</span><h1><span>BRAIN</span><span>DIVE</span></h1><div class="hero-subtitle">— 診 断 書 —</div><p>その声は、<br/>あなたのものですか。</p><div class="hero-actions"><button id="play-music">音楽ありではじめる <span>→</span></button><button id="play-silent">無音でプレイ</button></div><span class="headphone-note">HEADPHONES RECOMMENDED / 約10分</span></div>
+<div class="hero-case">症例 01<strong>月曜の朝</strong><span>田辺 悠介 / 28歳</span></div>
+</section>
+<div class="session-heading"><span>THE SESSION</span><p>混ざり合った声と記憶を、ほどいていく。</p><span>CASE 001</span></div>
+<section id="session" class="console" aria-label="BRAIN DIVE ゲーム"><div class="console-top"><span><i></i> <b id="scene-label">BRAIN DIVE / 待合室</b></span><span>BRAIN DIVE <span class="top-divider">/</span> VISUAL NOVEL</span></div><div class="viewport" id="viewport"><canvas id="game" width="960" height="540" tabindex="0" aria-label="BRAIN DIVE。Enterで開始。矢印で移動、Xで回転、Spaceで落下。"></canvas><div class="scanlines" aria-hidden="true"></div></div><div id="touch-controls" class="touch-controls" aria-label="タッチ操作">
 <div id="mobile-caption" class="mobile-caption" aria-live="off"></div>
 <div class="touch-menu" id="touch-menu">
 <button data-key="ArrowUp" aria-label="上の項目">↑</button><button data-key="ArrowDown" aria-label="下の項目">↓</button>
@@ -20,9 +25,9 @@
 <div class="touch-row"><button data-key="KeyH">ヒント</button><button data-key="Space" class="touch-primary">落とす</button></div>
 </div>
 <div class="touch-tools"><button data-key="Escape" id="touch-pause">一時停止</button><button data-key="KeyR" id="touch-retry" hidden>再挑戦</button><span>長押しで連続移動・落下</span></div>
-</div><div class="console-bottom"><span><span class="live-dot"></span><span id="state-label">SESSION READY</span></span><div><button id="sound" aria-label="音の切り替え">SOUND OFF</button><button id="fullscreen">⛶ FULLSCREEN</button></div></div></section>
+</div><div class="console-bottom"><span><span class="live-dot"></span><span id="state-label">SESSION READY</span></span><div><button id="puzzle-mode" aria-label="パズルモードを切り替え">思考モード</button><button id="sound" aria-label="音の切り替え">SOUND OFF</button><button id="fullscreen">⛶ FULLSCREEN</button></div></div></section>
 <div class="below"><p>心を治すのではなく、<br/><span>混ざり合った声と記憶を、分けていく。</span></p><div class="controls"><span><kbd>←</kbd><kbd>→</kbd> 移動</span><span><kbd>↑</kbd><kbd>X</kbd> 回転</span><span><kbd>SPACE</kbd> 決定 / 落下</span><span><kbd>ESC</kbd> ポーズ</span><button id="help">操作ガイド ↗</button></div></div>
-<details id="guide"><summary>遊び方・アクセシビリティ</summary><div class="guide-grid"><p>灰色の記憶の塊の隣で、同じ感情を縦・横に4つ消します。隣接消去2回で封印がほどけ、塊を取り除くと診断が進みます。2・4・6個の解放で記憶が現れ、上司の声がおじゃまを増やします。3枚そろうと「怒り」が解禁。橙色の怒りを、右下の黒い核の隣に着地させてください。</p><p>会話は Enter / Z / Space、質問は ↑ ↓ で選択。パズルは Z で逆回転、↓ で速く落下、H で一度だけヒント、R で再挑戦。設定で音量と動きの軽減を変更できます。スマートフォンでは画面下のボタンで同じ操作ができます。左右と「速く」は長押しできます。セーブはありません。</p></div></details>
-</main><footer><span>BRAIN DIVE <span class="footer-dash">—</span> 診断書</span><span>FICTIONAL CASE / ORIGINAL PIXEL ART</span><span>TAKE YOUR TIME.</span></footer>
+<details id="guide"><summary>遊び方・アクセシビリティ</summary><div class="guide-grid"><p>灰色の記憶の塊の隣で、同じ感情を縦・横に4つ消します。高さの違う6つの塊は足場にもなります。隣接消去2回で封印がほどけ、塊を取り除くと診断が進みます。2・4・6個の解放で記憶が現れ、上司の声がおじゃまを増やします。3枚そろうと「怒り」が解禁。橙色の怒りを、右下の黒い核の隣に着地させてください。</p><p>会話は Enter / Z / Space、質問は ↑ ↓ で選択。パズルは Z で逆回転、↓ で速く落下、H で一度だけヒント、R で再挑戦。設定で音量と動きの軽減を変更できます。スマートフォンでは画面下のボタンで同じ操作ができます。左右と「速く」は長押しできます。セーブはありません。</p></div></details>
+</main><footer><span>BRAIN DIVE <span class="footer-dash">—</span> 診断書</span><span>FICTIONAL CASE / ORIGINAL PIXEL ART</span><span>ORIGINAL SCORE &amp; PIXEL ART</span></footer>
 </div>
 </body></html>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Board, applyGravity, findMatches, pieceCells, resolve, type Piece } from './Board';
+import { SOLUTION_01 } from './solution01.testdata';
 import { HEIGHT, WIDTH, type Cell } from './level01';
 const empty = (): Cell[][] => Array.from({length:HEIGHT},()=>Array<Cell>(WIDTH).fill(null));
 function place(board:Board,x:number,rotation=0){expect(board.active).not.toBeNull();board.active={...board.active!,x,rotation};expect(board.valid(board.active)).toBe(true);board.drop();}
@@ -28,11 +29,11 @@ describe('ステージ進行',()=>{
   it('通常色や未解放の怒りでは勝利しない',()=>{const b=new Board(1,empty());b.cells[11][7]='CORE';place(b,6);expect(b.won).toBe(false);expect(b.cells[11][7]).toBe('CORE');const c=new Board(1,empty());c.cells[11][7]='CORE';c.active={...c.active!,x:6,pair:['ANGER','ANGER']};c.drop();expect(c.won).toBe(false);expect(c.cells[11][7]).toBe('CORE');});
   it('固定手順でおじゃま2・4・6個の解放、怒り解放、核無力化まで完走できる',()=>{
     const b=new Board();const triggered:number[]=[];
-    for(const x of [0,2,4,0,0,2,2,4,4]){place(b,x);triggered.push(...b.pendingMemories);if(b.pendingMemories.length)expect(b.active).toBeNull();resume(b);expect(b.failed).toBe(false);}
-    expect(triggered).toEqual([1,2,3]);expect(b.clears).toBe(6);expect(b.diagnosed).toBe(6);expect(b.memories).toBe(3);expect(b.active!.pair).toEqual(['ANGER','ANGER']);place(b,7);expect(b.won).toBe(true);expect(b.cells.flat().includes('CORE')).toBe(false);
+    for(const {x,rotation} of SOLUTION_01.slice(0,-1)){place(b,x,rotation);triggered.push(...b.pendingMemories);if(b.pendingMemories.length)expect(b.active).toBeNull();resume(b);expect(b.failed).toBe(false);}
+    expect(triggered).toEqual([1,2,3]);expect(b.clears).toBeGreaterThan(6);expect(b.diagnosed).toBe(6);expect(b.memories).toBe(3);expect(b.active!.pair).toEqual(['ANGER','ANGER']);place(b,7);expect(b.won).toBe(true);expect(b.cells.flat().includes('CORE')).toBe(false);
   });
   it('解放後も3ペアごとに怒りが補充される',()=>{const b=new Board(1,empty());b.memories=3;b.diagnosed=6;place(b,0);resume(b);const angerIndices:number[]=[];for(let i=0;i<13;i++){if(b.active!.pair.includes('ANGER'))angerIndices.push(i);b.cells=empty();place(b,i%6);resume(b);}expect(angerIndices[0]).toBe(0);for(let i=1;i<angerIndices.length;i++)expect(angerIndices[i]-angerIndices[i-1]).toBeLessThanOrEqual(3);});
-  it('ヒントは盤面やペアを変更せず、核の隣を案内する',()=>{const b=new Board();b.angerUnlocked=true;b.memories=3;b.active!.pair=['ANGER','ANGER'];const before=JSON.stringify(b.cells);expect(b.hint()).toContain('7列目');expect(JSON.stringify(b.cells)).toBe(before);});
+  it('ヒントは盤面やペアを変更せず、核の隣を案内する',()=>{const b=new Board(1,empty());b.cells[11][7]='CORE';b.angerUnlocked=true;b.memories=3;b.active!.pair=['ANGER','ANGER'];const before=JSON.stringify(b.cells);expect(b.hint()).toContain('7列目');expect(JSON.stringify(b.cells)).toBe(before);});
 });
 
 describe('おじゃまの解放が診断の根拠になる',()=>{
@@ -43,7 +44,7 @@ describe('おじゃまの解放が診断の根拠になる',()=>{
   });
   it('封印は隣接消去で一度だけひびになり、2回目で解放される',()=>{
     const c=empty();for(let x=0;x<4;x++)c[11][x]='ANXIETY';c[10][1]='SEALED_MEMORY';
-    const first=resolve(c);expect(first.released).toBe(0);expect(c[11][1]).toBe('CRACKED_MEMORY');
+    const first=resolve(c);expect(first.released).toBe(0);expect(c[10][1]).toBe('CRACKED_MEMORY');
     for(let y=8;y<12;y++)c[y][0]='GUILT';const second=resolve(c);expect(second.released).toBe(1);expect(c.flat().includes('CRACKED_MEMORY')).toBe(false);
   });
   it('隣接する同色が複数あっても、1波で封印を二重に削らない',()=>{
@@ -51,8 +52,11 @@ describe('おじゃまの解放が診断の根拠になる',()=>{
     expect(resolve(c).released).toBe(0);expect(c[11][1]).toBe('CRACKED_MEMORY');
   });
   it('最初の診断記憶を解放すると上司が現れ、その場でおじゃまを増やす',()=>{
-    const b=new Board();place(b,0);resume(b);expect(b.memories).toBe(0);place(b,2);
-    expect(b.diagnosed).toBe(2);expect(b.memories).toBe(1);expect(b.boss).toBe(true);expect(b.cells.flat().filter(c=>c==='REPROACH')).toHaveLength(2);
+    const b=new Board();
+    for(const {x,rotation} of SOLUTION_01){
+      place(b,x,rotation);if(b.boss)break;expect(b.diagnosed).toBeLessThan(2);resume(b);
+    }
+    expect(b.diagnosed).toBeGreaterThanOrEqual(2);expect(b.memories).toBe(1);expect(b.boss).toBe(true);expect(b.bossAttack).toBe(true);expect(b.cells.flat().filter(c=>c==='REPROACH')).toHaveLength(2);
   });
   it('上司が増やした叱責だけを消しても診断記憶は増えない',()=>{
     const b=new Board(1,empty());for(let y=8;y<12;y++)b.cells[y][0]='ANXIETY';b.cells[11][1]='REPROACH';place(b,5);
@@ -62,4 +66,23 @@ describe('おじゃまの解放が診断の根拠になる',()=>{
     const b=new Board(1,empty());for(let x=0;x<4;x++)b.cells[11][x]='SEALED_MEMORY';expect(findMatches(b.cells)).toHaveLength(0);
     b.angerUnlocked=true;b.memories=3;b.cells[11][7]='CORE';b.active!.pair=['ANGER','ANGER'];place(b,7);expect(b.won).toBe(false);expect(b.cells[11][7]).toBe('CORE');
   });
+});
+
+describe('段差と足場のある診断盤面',()=>{
+  it('6つの記憶が複数の高さに分散し、重力で下へ落ちない',()=>{
+    const b=new Board();const positions=()=>b.cells.flatMap((row,y)=>row.flatMap((c,x)=>c==='SEALED_MEMORY'?[{x,y}]:[]));
+    const before=positions();expect(before).toHaveLength(6);expect(new Set(before.map(p=>p.y)).size).toBeGreaterThanOrEqual(3);expect(before.every(p=>p.x>=2&&p.x<=5&&p.y>=6&&p.y<=9)).toBe(true);applyGravity(b.cells);expect(positions()).toEqual(before);
+  });
+  it('封印を解くとその上の足場が落ち、次の連鎖へつながる',()=>{
+    const c=empty();c[8][1]='CRACKED_MEMORY';c[7][1]='FATIGUE';for(let y=8;y<12;y++)c[y][0]='ANXIETY';
+    expect(resolve(c).released).toBe(1);expect(c[11][1]).toBe('FATIGUE');
+  });
+  it('妨害が出現位置を直接塞いだり、核への通路を埋めたりしない',()=>{
+    const b=new Board(1,empty());b.cells[2][3]='FATIGUE';for(let i=0;i<20;i++)b.addReproach();expect(b.cells[0][3]).toBeNull();expect(b.cells[0][7]).toBeNull();
+  });
+});
+
+it('着地予測は封印への接触を示し、盤面・乱数・進行を変更しない',()=>{
+ const b=new Board();const before=JSON.stringify(b);b.active!.x=6;const beforePreview=JSON.stringify(b);const preview=b.preview();
+ expect(preview.affected.length).toBeGreaterThan(0);expect(preview.released).toBe(0);expect(JSON.stringify(b)).toBe(beforePreview);expect(before).not.toBe(beforePreview);
 });

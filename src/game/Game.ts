@@ -10,20 +10,24 @@ const labels:Record<Scene,string>={TITLE:'待合室',SETTINGS:'設定',ROOM_INTR
 export class Game {
   art:Art; input:Input; sound=new Sound();
   scene:Scene='TITLE'; sceneTime=0; time=0; selected=0; question=0; line=0; typed=0;
+  timed=false;
   reduced=true; pause=false; board=new Board(); dropTime=0; resolveTime=0; memory=1;
   hintUsed=false; hintText=''; hintTime=0; titleSelected=0; settingsSelected=0;
+  private impact=0; private releaseGlow=0; private bossFlash=0; private lastGlyph=0;
   private previous=0; private accumulator=0; private stampPlayed=false;
   constructor(public canvas:HTMLCanvasElement) {
     this.art=new Art(canvas.getContext('2d')!);this.input=new Input(canvas);
-    try{const s=JSON.parse(localStorage.getItem('brain-dive-settings')??'{}');this.reduced=typeof s.reduced==='boolean'?s.reduced:true;this.sound.muted=typeof s.muted==='boolean'?s.muted:true;this.sound.volume=typeof s.volume==='number'?Math.max(0,Math.min(1,s.volume)):.3;}catch{/* Storage can be disabled. */}
+    try{const s=JSON.parse(localStorage.getItem('brain-dive-settings')??'{}');this.timed=s.timed===true;this.reduced=typeof s.reduced==='boolean'?s.reduced:true;this.sound.muted=typeof s.muted==='boolean'?s.muted:false;this.sound.volume=typeof s.volume==='number'?Math.max(0,Math.min(1,s.volume)):.45;}catch{/* Storage can be disabled. */}
     window.addEventListener('blur',()=>{if(!['TITLE','SETTINGS','COMPLETE'].includes(this.scene)){this.pause=true;}});
     document.addEventListener('visibilitychange',()=>{if(document.hidden&&!['TITLE','SETTINGS','COMPLETE'].includes(this.scene))this.pause=true;});
-    canvas.addEventListener('pointerdown',()=>canvas.focus());this.change('TITLE');requestAnimationFrame(this.frame);
+    canvas.addEventListener('pointerdown',()=>{this.sound.unlock();canvas.focus();});
+    window.addEventListener('keydown',()=>{if(document.activeElement===canvas)this.sound.unlock();});this.change('TITLE');requestAnimationFrame(this.frame);
   }
-  save(){try{localStorage.setItem('brain-dive-settings',JSON.stringify({reduced:this.reduced,muted:this.sound.muted,volume:this.sound.volume}));}catch{}this.syncSound();}
+  save(){try{localStorage.setItem('brain-dive-settings',JSON.stringify({timed:this.timed,reduced:this.reduced,muted:this.sound.muted,volume:this.sound.volume}));}catch{}this.syncSound();}
   syncSound(){document.querySelector('#sound')!.textContent=this.sound.muted?'SOUND OFF':'SOUND ON';}
+  toggleMode(){this.timed=!this.timed;this.dropTime=0;this.save();}
   toggleSound(){this.sound.unlock();this.sound.muted=!this.sound.muted;this.save();}
-  change(scene:Scene) {this.scene=scene;this.sceneTime=0;this.typed=0;this.input.clear();this.dropTime=0;document.querySelector('#scene-label')!.textContent=`BRAIN DIVE / ${labels[scene]}`;document.querySelector('#state-label')!.textContent=scene==='TITLE'?'SESSION READY':scene==='COMPLETE'?'SESSION COMPLETE':`CASE 001 · ${labels[scene]}`;}
+  change(scene:Scene) {this.scene=scene;if(scene==='MEMORY')this.sound.play('memory');if(scene==='RETURN')this.sound.play('win');this.sceneTime=0;this.typed=0;this.input.clear();this.dropTime=0;document.querySelector('#scene-label')!.textContent=`BRAIN DIVE / ${labels[scene]}`;document.querySelector('#state-label')!.textContent=scene==='TITLE'?'SESSION READY':scene==='COMPLETE'?'SESSION COMPLETE':`CASE 001 · ${labels[scene]}`;}
   start(){this.board=new Board();this.line=0;this.selected=0;this.hintUsed=false;this.hintText='';this.pause=false;this.sound.play('confirm');this.change('ROOM_INTRO');}
   retry(){this.board=new Board();this.resolveTime=0;this.hintUsed=false;this.hintText='';this.pause=false;this.change('PUZZLE');}
   currentLine(){if(this.scene==='DIALOGUE')return intro[this.line];if(this.scene==='ANSWER')return {speaker:'田辺 悠介',text:this.line===0?replies[this.question]:lastLine};if(this.scene==='OUTRO')return outro[this.line];return {speaker:'',text:''};}
@@ -56,13 +60,24 @@ export class Game {
     if(this.scene==='REPORT'&&confirm(key)){if(this.sceneTime<9)this.sceneTime=9;else this.change('COMPLETE');return;}
     if(this.scene==='COMPLETE'&&confirm(key))this.change('TITLE');
   }
-  private afterLock(){this.resolveTime=this.board.lastWaves.length?.38:.15;this.dropTime=0;this.sound.play(this.board.lastWaves.length?'clear':'land');}
+  private afterLock(){
+    this.resolveTime=this.board.lastWaves.length?.65:.15;this.dropTime=0;
+    this.impact=.25;
+    if(this.board.lastReleased){this.releaseGlow=1.2;this.sound.play('release');}
+    else this.sound.play(this.board.lastDamaged?'crack':this.board.lastWaves.length?'clear':'land');
+    if(this.board.lastChain>1){this.sound.play('chain');this.impact=.35;this.releaseGlow=Math.max(this.releaseGlow,.9);}
+    if(this.board.bossAttack){this.bossFlash=1.3;this.sound.play('boss');}
+  }
   private update(dt:number){
     this.time+=dt;
+    if(!this.art.ready&&!['TITLE','SETTINGS'].includes(this.scene)){this.input.clear();this.sound.update('TITLE',this.pause);return;}
     // Consume at most one action at a scene boundary; no input leaks into the next scene.
     for(const key of this.input.take()){const before=this.scene;this.sound.unlock();this.key(key);if(this.scene!==before)break;}
+    this.sound.update(this.scene,this.pause,this.board.boss,this.board.height());
     if(this.pause)return;
-    this.sceneTime+=dt;this.typed+=dt*25;this.hintTime=Math.max(0,this.hintTime-dt);
+    this.impact=Math.max(0,this.impact-dt);this.releaseGlow=Math.max(0,this.releaseGlow-dt);this.bossFlash=Math.max(0,this.bossFlash-dt);
+    this.sceneTime+=dt;this.typed+=dt*25;
+    if(['DIALOGUE','ANSWER','OUTRO'].includes(this.scene)&&Math.floor(this.typed/3)!==this.lastGlyph&&this.typed<this.currentLine().text.length){this.lastGlyph=Math.floor(this.typed/3);this.sound.play('type');}this.hintTime=Math.max(0,this.hintTime-dt);
     if(this.scene==='ROOM_INTRO'&&this.sceneTime>3){this.line=0;this.change('DIALOGUE');}
     if(this.scene==='DIVE'&&this.sceneTime>3.8)this.change('PUZZLE');
     if(this.scene==='RETURN'&&this.sceneTime>2.5){this.line=0;this.change('OUTRO');}
@@ -71,6 +86,7 @@ export class Game {
     if(this.resolveTime>0){this.resolveTime-=dt;if(this.resolveTime<=0){if(this.board.won){this.sound.play('clear');this.change('RETURN');}else if(this.board.pendingMemories.length){this.memory=this.board.pendingMemories.shift()!;this.change('MEMORY');}else this.board.spawn();}return;}
     for(const code of this.input.repeat(dt)){if(code==='ArrowLeft')this.board.move(-1);if(code==='ArrowRight')this.board.move(1);}
     if(!this.board.active)return;
+    if(!this.timed&&!this.input.held.has('ArrowDown')){this.dropTime=0;return;}
     this.dropTime+=dt;
     const interval=this.input.held.has('ArrowDown')?SOFT_SECONDS:FALL_SECONDS;
     if(this.dropTime>=interval){this.dropTime=0;this.board.step();if(!this.board.active)this.afterLock();}
@@ -78,7 +94,9 @@ export class Game {
   private frame=(now:number)=>{const dt=this.previous?Math.min((now-this.previous)/1000,.1):0;this.previous=now;this.accumulator+=dt;while(this.accumulator>=1/60){this.update(1/60);this.accumulator-=1/60;}this.draw();requestAnimationFrame(this.frame);};
   private dialogue() {const a=this.art,l=this.currentLine();a.box(7,123,306,51,'#c5bfcb','#0a0b13');a.text(l.speaker,16,129,'#c3a68c',6);a.wrapped(l.text.slice(0,Math.floor(this.typed)),17,141,279,'#e9e3da',7,11);if(this.typed>=l.text.length&&Math.floor(this.time*2)%2)a.text('▼',301,162,'#bda4be',6);}
   private puzzle(){const a=this.art,b=this.board;a.brain(this.time,this.reduced,b.boss);
-    a.text('STAGE 01',10,12,'#a4a2bc',6);a.text('月曜の朝',10,23,'#eee3df',8);a.rect(10,39,56,1,'#514363');
+    a.rect(4,7,66,156,'#090c16df');a.rect(244,7,70,153,'#090c16df');
+    if(!this.reduced&&this.impact>0){a.c.translate(Math.round(Math.sin(this.time*85)*this.impact*5),Math.round(this.impact*4));}
+    a.text(this.timed?'STAGE 01 / LIVE':'STAGE 01 / THINK',10,12,'#a4a2bc',6);a.text('月曜の朝',10,23,'#eee3df',8);a.rect(10,39,56,1,'#514363');
     a.text('DIAGNOSIS',10,47,'#857991',5);for(let i=0;i<3;i++){a.box(10+i*18,57,13,11,i<b.memories?'#e7bb92':'#4c405e',i<b.memories?'#57405d':'#171423');a.text(`${i+1}`,16+i*18,59,i<b.memories?'#f5d6af':'#655b75',6,'center');}
     a.text(`${b.diagnosed} / 6 解放`,10,75,'#b5a3bc',5);a.block('SEALED_MEMORY',10,84);a.text('封印→ひび→解放',22,86,'#beab9a',4);a.text('NEXT',10,96,'#a9a0b8',5);
     b.queue.slice(0,2).forEach((pair,i)=>{a.box(10+i*27,101,22,27,'#43364f','#12101f');a.block(pair[1],17+i*27,104);a.block(pair[0],17+i*27,114);});
@@ -89,11 +107,20 @@ export class Game {
     const ghost=b.ghost();if(ghost)pieceCells(ghost).forEach((p,i)=>a.block(ghost.pair[i],121+p.x*10,25+p.y*10,true));
     b.cells.forEach((r,y)=>r.forEach((kind,x)=>{if(kind)a.block(kind,121+x*10,25+y*10);}));
     if(b.active){const piece=b.active;pieceCells(piece).forEach((p,i)=>a.block(piece.pair[i],121+p.x*10,25+p.y*10));}
+    const preview=b.preview();
+    if(preview.affected.length){
+      for(const p of preview.affected){a.c.strokeStyle='#f7c3df';a.c.lineWidth=1;a.c.strokeRect(120.5+p.x*10,24.5+p.y*10,10,10);}
+      a.text(preview.released?`解放予測 +${preview.released}`:`封印に届く / ${preview.affected.length}`,10,131,'#e7b0d0',4);
+    }
+
     if(this.resolveTime>0&&b.lastWaves.length){for(const wave of b.lastWaves)for(const p of wave){a.c.globalAlpha=Math.max(0,this.resolveTime/.4)*.6;a.rect(121+p.x*10,25+p.y*10,9,9,'#e6c4e2');a.c.globalAlpha=1;}}
-    a.rect(74,164,240,13,'#0b0914');let message=b.angerUnlocked?'怒りを、右下の黒い核の隣に。':b.clears===0?'記憶の塊の隣で4個消し。封印を解こう。':b.memories===0?'封印を2回ほどき、塊を取り除こう。':b.memories===1?'誰の声が、あなたを責めている？':'すべてを、一人で引き受けていた。';if(this.hintTime>0)message=this.hintText;a.text(message,79,168,'#c9b0c9',6);
+    if(this.releaseGlow>0)a.releaseParticles(this.time,this.releaseGlow,b.lastWaves,b.lastReleased?'記憶の封印がほどける':`${b.lastChain} CHAIN / 感情がつながる`);
+    if(this.bossFlash>0){a.c.globalAlpha=Math.min(.7,this.bossFlash);a.text('その記憶に、触れるな。',160,13,'#ee90b7',7,'center');a.c.globalAlpha=1;}
+    a.rect(74,164,240,13,'#0b0914');let message=b.angerUnlocked?'怒りを、右下の黒い核の隣に。':b.clears===0?'中央の6つの記憶を、周囲からほどく。':b.memories===0?'封印を2回ほどき、塊を取り除こう。':b.memories===1?'誰の声が、あなたを責めている？':'すべてを、一人で引き受けていた。';if(this.hintTime>0)message=this.hintText;a.text(message,79,168,'#c9b0c9',6);
     if(b.failed){a.c.globalAlpha=.85;a.rect(0,0,320,180,'#090912');a.c.globalAlpha=1;a.box(60,58,200,63,'#a480a6');a.text('脳内が飽和した',160,72,'#e2c4d3',10,'center');a.text('急がなくて大丈夫。もう一度、整理しよう。',160,92,'#a79bb4',6,'center');a.text('ENTER / R  再挑戦',160,106,'#dbc49e',6,'center');}
   }
-  private draw(){const a=this.art,c=a.c;c.globalAlpha=1;c.setTransform(1,0,0,1,0,0);a.rect(0,0,320,180,'#090912');
+  private draw(){const a=this.art,c=a.c;c.globalAlpha=1;const scale=(this.canvas.width||320)/320;c.setTransform(scale,0,0,scale,0,0);a.rect(0,0,320,180,'#090912');
+    if(!this.art.ready&&!['TITLE','SETTINGS'].includes(this.scene)){a.text('記憶の輪郭を、読み込んでいます。',160,82,'#d6bdcf',9,'center');return;}
     if(this.scene==='TITLE'){a.title(this.time,this.reduced);a.text(this.titleSelected===0?'◆':' ',23,139,'#e4ad9a',7);a.text('はじめる',37,139,this.titleSelected===0?'#f1dfc7':'#84798e',8);a.text(this.titleSelected===1?'◆':' ',105,140,'#e4ad9a',7);a.text('設定',119,140,this.titleSelected===1?'#f1dfc7':'#84798e',7);a.text('↑ ↓ 選択    ENTER 決定',21,157,'#71677f',4);}
     else if(this.scene==='SETTINGS'){a.title(this.time,this.reduced);a.box(48,26,224,129,'#b69db8','#12111e');a.text('SETTINGS / 設定',65,39,'#e5d1ba',8);const settings=[`サウンド：${this.sound.muted?'OFF':'ON'}`,`音量：${Math.round(this.sound.volume*100)}%  ← →`,`動き・点滅の軽減：${this.reduced?'ON':'OFF'}`,'タイトルへ戻る'];settings.forEach((s,i)=>{a.text(i===this.settingsSelected?'◆':'',64,63+i*18,'#e5acb0',7);a.text(s,78,63+i*18,i===this.settingsSelected?'#e9dccb':'#8a819a',7);});a.text('ENTER 変更 / ESC 戻る',160,143,'#8a819a',5,'center');}
     else if(['ROOM_INTRO','DIALOGUE','QUESTION','ANSWER','OUTRO'].includes(this.scene)){a.room(this.time,this.scene==='ROOM_INTRO'?65+Math.min(1,this.sceneTime/2.5)*46:111,this.scene!=='ROOM_INTRO'||this.sceneTime>2.5);if(['DIALOGUE','ANSWER','OUTRO'].includes(this.scene))this.dialogue();if(this.scene==='ROOM_INTRO'){a.box(7,135,306,39);a.text('扉が、静かに開く。',19,147,'#aca0b3',7);a.text('ENTER 進む',301,162,'#726b82',5,'right');}if(this.scene==='QUESTION'){a.box(7,115,306,59);a.text('どの言葉から、たどってみよう。',17,121,'#a58ba7',6);questions.forEach((s,i)=>{a.text(i===this.selected?'◆':'',18,135+i*11,'#e2a8aa',6);a.text(s,32,135+i*11,i===this.selected?'#efe2d2':'#8c819a',7);});}}
@@ -105,6 +132,7 @@ export class Game {
       else if(t<2.8){
         const opening=Math.max(0,(t-2)/.8);
         a.faceCloseup(4+Math.pow(opening,2)*225,!this.reduced&&t>1.8);
+        if(t>1.3)a.intrusion(t,this.reduced,Math.min(1,(t-1.3)/.7));
         if(t<1.3)black(1-(t-.8)/.5);
       }else if(t<3.05){a.rect(0,0,320,180,'#070911');}
       else{this.puzzle();black(1-(t-3.05)/.75);}

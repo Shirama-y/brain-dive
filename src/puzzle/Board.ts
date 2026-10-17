@@ -1,4 +1,4 @@
-import { WIDTH, HEIGHT, initialCells, MEMORY_THRESHOLDS, FIXED_PAIRS, type Cell, type Emotion, type Pair } from './level01';
+import { WIDTH, HEIGHT, isAnchor, initialCells, MEMORY_THRESHOLDS, FIXED_PAIRS, type Cell, type Emotion, type Pair } from './level01';
 export type Point = { x: number; y: number };
 export type Piece = Point & { rotation: number; pair: Pair };
 export const OFFSETS: Point[] = [{x:0,y:-1},{x:1,y:0},{x:0,y:1},{x:-1,y:0}];
@@ -20,11 +20,11 @@ export function findMatches(cells: Cell[][]): Point[] {
   return result;
 }
 export function applyGravity(cells: Cell[][]): void {
-  // A fixed core divides its column into independent gravity segments.
+  // Fixed memories and the core divide each column into independent gravity segments.
   for (let x=0;x<WIDTH;x++) {
     let target = HEIGHT-1;
     for (let y=HEIGHT-1;y>=0;y--) {
-      if (cells[y][x] === 'CORE') { target = y-1; continue; }
+      if (isAnchor(cells[y][x])) { target = y-1; continue; }
       if (cells[y][x] !== null) { const c = cells[y][x]; cells[y][x] = null; cells[target][x] = c; target--; }
     }
   }
@@ -62,6 +62,8 @@ export class Board {
   pendingMemories: number[] = [];
   boss = false; won = false; failed = false; angerUnlocked = false;
   lastWaves: Point[][] = [];
+  lastReleased = 0; lastDamaged = 0; lastChain = 0;
+  bossAttack = false;
   private randomState: number;
   private pairIndex = 0; private angerCount = 0;
   constructor(seed = 4107, cells = initialCells()) { this.cells = cells.map(r => [...r]); this.randomState = seed; this.queue = [this.nextPair(),this.nextPair(),this.nextPair()]; this.spawn(); }
@@ -93,6 +95,13 @@ export class Board {
     return false;
   }
   ghost(): Piece | null { if (!this.active) return null; const p = {...this.active}; while (this.valid({...p,y:p.y+1})) p.y++; return p; }
+  preview(): {affected:Point[];chain:number;released:number} {
+    const piece=this.ghost();if(!piece)return {affected:[],chain:0,released:0};
+    const copy=this.cells.map(row=>[...row]);pieceCells(piece).forEach((p,i)=>{copy[p.y][p.x]=piece.pair[i];});applyGravity(copy);
+    const result=resolve(copy),affected:Point[]=[];
+    for(let y=0;y<HEIGHT;y++)for(let x=0;x<WIDTH;x++)if((this.cells[y][x]==='SEALED_MEMORY'||this.cells[y][x]==='CRACKED_MEMORY')&&copy[y][x]!==this.cells[y][x])affected.push({x,y});
+    return {affected,chain:result.waves.length,released:result.released};
+  }
   drop() { if (!this.active) return; this.active = this.ghost(); this.lock(); }
   step() { if (!this.move(0,1)) this.lock(); }
   lock() {
@@ -100,6 +109,8 @@ export class Board {
     const points = pieceCells(this.active), pair = this.active.pair;
     points.forEach((p,i) => { this.cells[p.y][p.x] = pair[i]; });
     this.active = null; this.turns++;
+    this.lastReleased = 0; this.lastDamaged = 0; this.bossAttack = false;
+    const sealedBefore = this.cells.flat().filter(c=>c==='SEALED_MEMORY').length;
     // Split a horizontal pair onto its individual landing heights before matching.
     applyGravity(this.cells);
     if (this.angerUnlocked && this.memories === 3 && this.diagnosed >= 6) {
@@ -109,6 +120,8 @@ export class Board {
       }
     }
     const result = resolve(this.cells); this.lastWaves = result.waves;
+    this.lastReleased = result.released; this.lastChain = result.waves.length;
+    this.lastDamaged = sealedBefore - this.cells.flat().filter(c=>c==='SEALED_MEMORY').length;
     this.clears += result.waves.length;
     this.diagnosed += result.released; this.reproachesCleared += result.reproaches;
     const wasBoss = this.boss;
@@ -119,12 +132,13 @@ export class Board {
       // Rebuild lookahead so the first guaranteed anger and later refills are at most 3 pairs apart.
       this.queue = [['ANGER','ANGER'], this.nextPair(), this.nextPair()];
     }
-    if (this.boss && !wasBoss) { this.addReproach(); this.addReproach(); }
-    else if (this.boss && this.turns % 6 === 0 && !this.won) this.addReproach();
+    if (this.boss && !wasBoss) { this.addReproach(); this.addReproach(); this.bossAttack = true; }
+    else if (this.boss && this.turns % 6 === 0 && !this.won) { this.bossAttack=this.addReproach(); }
     // Caller resumes spawning only after clear/memory animation has finished.
   }
   addReproach(): boolean {
-    const candidates = Array.from({length:WIDTH},(_,x)=>x).filter(x => x !== 7 && this.cells[0][x] === null);
+    const candidates = Array.from({length:WIDTH},(_,x)=>x).filter(x => x !== 7 && this.cells[0][x] === null && this.cells[1][x] === null && this.cells[2][x] === null);
+    // Keep the spawn lane usable and the core approach open; attacks create decisions, not instant losses.
     if (!candidates.length) return false;
     const x = candidates[Math.floor(this.random()*candidates.length)];
     this.cells[0][x] = 'REPROACH'; applyGravity(this.cells); return true;
