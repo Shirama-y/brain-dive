@@ -1,3 +1,4 @@
+import {fragments,fragmentById,type FragmentId} from '../data/fragments';
 import {keyOf,type Point,type Cell,type CellView,type MoveResult} from './types';
 export const WIDTH=8,HEIGHT=8,MINE_COUNT=6;
 export const FEELINGS=['叱責の記憶','自分を責める声','疲れ'];
@@ -8,6 +9,7 @@ export class MinesweeperBoard {
  cells:Cell[][]=Array.from({length:HEIGHT},(_,y)=>Array.from({length:WIDTH},(_,x)=>({x,y,mine:false,open:false,flagged:false,adjacent:0})));
  generated=false;failed=false;won=false;moves=0;counselings=0;selected:Point={x:4,y:5};exploded?:Point;
  hints=new Set<string>();message='数字は周囲8マスの地雷の数。地雷以外をすべて開こう。最初の一手は安全です。';
+ readonly foundFragments:FragmentId[]=[];private memoryCells=new Map<string,FragmentId>();
  private randomState:number;
  constructor(seed=Date.now()){this.randomState=seed>>>0;}
  tile(p:Point){return this.cells[p.y]?.[p.x];}
@@ -27,11 +29,19 @@ export class MinesweeperBoard {
   for(let i=candidates.length-1;i>0;i--){const j=Math.floor(this.random()*(i+1));[candidates[i],candidates[j]]=[candidates[j],candidates[i]];}
   for(const c of candidates.slice(0,this.mineCount))c.mine=true;
   for(const c of this.cells.flat())c.adjacent=this.neighbors(c).filter(n=>n.mine).length;
+  // Each feeling has one fragment on a safe cell. Prefer numbered, distant cells
+  // so an opening flood is less likely to reveal the entire story at once.
+  for(const f of fragments){
+   const choices=this.cells.flat().filter(c=>!c.mine&&feelingAt(c)===f.topic&&!protectedCells.has(keyOf(c)));
+   choices.sort((a,b)=>b.adjacent-a.adjacent||(Math.abs(b.x-first.x)+Math.abs(b.y-first.y))-(Math.abs(a.x-first.x)+Math.abs(a.y-first.y))||a.y-b.y||a.x-b.x);
+   const target=choices[0]??this.cells.flat().find(c=>!c.mine&&feelingAt(c)===f.topic)!;
+   this.memoryCells.set(keyOf(target),f.id);
+  }
   this.generated=true;
  }
  view(p:Point):CellView|undefined{const c=this.tile(p);if(!c)return;
   if(this.failed&&c.mine)return {x:p.x,y:p.y,state:this.exploded&&keyOf(this.exploded)===keyOf(c)?'exploded':'mine'};
-  if(c.open)return {x:p.x,y:p.y,state:'open',adjacent:c.adjacent};
+  if(c.open){const memoryId=this.memoryCells.get(keyOf(c));return memoryId?{x:p.x,y:p.y,state:'open',adjacent:c.adjacent,memoryId}:{x:p.x,y:p.y,state:'open',adjacent:c.adjacent};}
   if(c.flagged)return {x:p.x,y:p.y,state:'flagged',wrongFlag:this.failed&&!c.mine};
   return {x:p.x,y:p.y,state:this.hints.has(keyOf(c))?'hint':'closed'};
  }
@@ -40,6 +50,7 @@ export class MinesweeperBoard {
   if(v.state==='exploded'||v.state==='mine')return '地雷。患者がパニックに陥り、セッションを続けられなくなった。';
   if(v.state==='flagged')return v.wrongFlag?'安全なマスに置かれていた旗です。':'旗：地雷と思う場所の印。旗を外すまで開きません。';
   if(v.state==='hint')return '安全ヒント：カウンセリングで見えた、地雷のないマスです。開いて大丈夫。';
+  if(v.memoryId)return `記憶の断片「${fragmentById(v.memoryId).title}」を見つけたマスです。記録から読み返せます。周囲の地雷 ${v.adjacent} 個。`;
   if(v.state==='open')return v.adjacent?`周囲8マスに地雷が ${v.adjacent} 個あります。斜めも数えます。`:'周囲8マスに地雷はありません。';
   return `${FEELINGS[feelingAt(p)]}：未開封。数字は近くの不安の核の数。迷ったら話を聞き、金色の安心マスを開きましょう。最初の一手は安全です。`;
  }
@@ -49,8 +60,13 @@ export class MinesweeperBoard {
   if(!this.generated)this.generate(p);const first=this.tile(p)!;this.moves++;
   if(first.mine){first.open=true;this.exploded={x:p.x,y:p.y};this.failed=true;return this.result({ok:true,kind:'explode',at:{x:p.x,y:p.y},message:'地雷が爆発した。患者の中で、抑えていた声があふれ出す。'});}
   const queue=[first];while(queue.length){const c=queue.pop()!;if(c.open||c.flagged||c.mine)continue;c.open=true;if(c.adjacent===0)for(const n of this.neighbors(c))if(!n.open&&!n.mine&&!n.flagged)queue.push(n);}
+  const discoveries:FragmentId[]=[];
+  for(const c of this.cells.flat()){
+   const id=this.memoryCells.get(keyOf(c));if(c.open&&id&&!this.foundFragments.includes(id))discoveries.push(id);
+  }
+  discoveries.sort((a,b)=>fragmentById(a).topic-fragmentById(b).topic);this.foundFragments.push(...discoveries);
   this.won=this.opened===this.safeTotal;
-  return this.result({ok:true,kind:this.won?'win':'open',at:{x:p.x,y:p.y},message:this.won?'安全なマスをすべて開いた。患者の呼吸が落ち着いてきた。':`${this.opened} / ${this.safeTotal} マスを開いた。迷ったらカウンセリングで安全なヒントを得られます。`});
+  return this.result({ok:true,kind:this.won?'win':'open',discoveries,at:{x:p.x,y:p.y},message:discoveries.length?`記憶の断片を ${discoveries.length} つ発見。患者の言葉を、記録から読み返せます。${this.won?'安全なマスをすべて開きました。':''}`:this.won?'安全なマスをすべて開いた。患者の呼吸が落ち着いてきた。':`${this.opened} / ${this.safeTotal} マスを開いた。迷ったらカウンセリングで安全なヒントを得られます。`});
  }
  toggleFlag(p:Point):MoveResult{const c=this.tile(p);this.selected={x:p.x,y:p.y};if(!c||c.open||this.finished)return {ok:false,message:'未開封のマスに旗を立てられます。'};
   c.flagged=!c.flagged;return this.result({ok:true,kind:'flag',at:{x:p.x,y:p.y},message:c.flagged?'旗を立てた。旗は印なので、正解とは限りません。':'旗を外した。このマスを開けるようになりました。'});
@@ -64,7 +80,7 @@ export class MinesweeperBoard {
   if(!this.generated&&existing.length)targets=existing;
   else {
    const safe=this.cells.flat().filter(c=>!c.open&&!c.mine&&!this.hints.has(keyOf(c)));
-   safe.sort((a,b)=>Number(feelingAt(b)===topic)-Number(feelingAt(a)===topic)||Number(a.flagged)-Number(b.flagged)||Number(this.neighbors(b).some(n=>n.open))-Number(this.neighbors(a).some(n=>n.open))||Math.abs(a.x-this.selected.x)+Math.abs(a.y-this.selected.y)-Math.abs(b.x-this.selected.x)-Math.abs(b.y-this.selected.y));
+   safe.sort((a,b)=>Number(feelingAt(b)===topic)-Number(feelingAt(a)===topic)||Number(this.memoryCells.has(keyOf(b)))-Number(this.memoryCells.has(keyOf(a)))||Number(a.flagged)-Number(b.flagged)||Number(this.neighbors(b).some(n=>n.open))-Number(this.neighbors(a).some(n=>n.open))||Math.abs(a.x-this.selected.x)+Math.abs(a.y-this.selected.y)-Math.abs(b.x-this.selected.x)-Math.abs(b.y-this.selected.y));
    targets=safe.slice(0,count);
    if(!targets.length)targets=this.cells.flat().filter(c=>!c.mine&&!c.open).slice(0,count);
   }

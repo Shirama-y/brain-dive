@@ -123,6 +123,7 @@ export class Art {
     for(const [x,y] of [[225,91],[106,146]]){this.rect(x,y,8,15,'#702b75');this.rect(x+1,y+1,6,13,'#cf5187');this.rect(x+5,y+8,1,1,'#f8c8b3');}
     if(boss)this.boss(264,28,t);
   }
+  fragment(panel:number,x:number,y:number,w:number,h:number){return this.novel.draw(this.c,'scenes',x,y,w,h,panel);}
   /** The reprimand scene from the original four-panel illustration sheet. */
   reprimand() {
     if(this.novel.draw(this.c,'scenes',0,0,320,180,3))return;

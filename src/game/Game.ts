@@ -2,6 +2,7 @@ import { Art } from '../render/Art';
 import { MinesweeperBoard } from '../minesweeper/Board';
 import { MinesweeperRenderer } from '../render/MinesweeperRenderer';
 import { MinesweeperEffects } from '../render/MinesweeperEffects';
+import {fragments,fragmentById,type FragmentId} from '../data/fragments';
 import { counselingQuestions } from '../data/counseling';
 import type { Point, MoveResult } from '../minesweeper/types';
 import { intro, questions, replies, lastLine, outro, diveIntroduction } from '../data/story';
@@ -16,6 +17,9 @@ export class Game {
   scene:Scene='TITLE'; sceneTime=0; time=0; selected=0; question=0; line=0; typed=0;
   reduced=true;pause=false;board=new MinesweeperBoard();flagMode=false;
   renderer=new MinesweeperRenderer();effects=new MinesweeperEffects();
+  activeFragmentId?:FragmentId;
+  get currentFragment(){return this.activeFragmentId?fragmentById(this.activeFragmentId):undefined;}
+  readFragment(id:FragmentId){if(!this.pause&&this.board.foundFragments.includes(id)){this.activeFragmentId=id;}}
   interviewAnswer='';private interviewPoint:Point={x:4,y:5};
   settingsSelected=0;private lastGlyph=0;private returningToMind=false;private lastDiveShot=0;
   get diveCaption(){return diveShotAt(this.sceneTime,this.reduced,this.returningToMind).caption;}
@@ -33,8 +37,8 @@ export class Game {
   openSettings(){this.settingsSelected=0;this.change('SETTINGS');}
   toggleSound(){this.sound.unlock();this.sound.muted=!this.sound.muted;this.save();}
   change(scene:Scene) {this.scene=scene;if(scene==='DIVE')this.lastDiveShot=0;if(scene==='RETURN')this.sound.play('win');this.sceneTime=0;this.typed=0;this.input.clear();document.querySelector('#scene-label')!.textContent=`BRAIN DIVE / ${labels[scene]}`;document.querySelector('#state-label')!.textContent=scene==='TITLE'?'SESSION READY':scene==='COMPLETE'?'SESSION COMPLETE':`CASE 001 · ${labels[scene]}`;}
-  start(){this.returningToMind=false;this.board=new MinesweeperBoard();this.effects.remaining=0;this.flagMode=false;this.line=0;this.selected=0;this.pause=false;this.sound.play('confirm');this.change('ROOM_INTRO');}
-  retry(){this.board=new MinesweeperBoard();this.effects.remaining=0;this.flagMode=false;this.pause=false;this.change('PUZZLE');}
+  start(){this.activeFragmentId=undefined;this.returningToMind=false;this.board=new MinesweeperBoard();this.effects.remaining=0;this.flagMode=false;this.line=0;this.selected=0;this.pause=false;this.sound.play('confirm');this.change('ROOM_INTRO');}
+  retry(){this.activeFragmentId=undefined;this.board=new MinesweeperBoard();this.effects.remaining=0;this.flagMode=false;this.pause=false;this.change('PUZZLE');}
   returnToTitle(){this.pause=false;this.change('TITLE');}
   selectTile(p:Point){if(this.scene==='PUZZLE'&&!this.pause&&this.board.tile(p))this.board.selected={...p};}
   tap(p:Point){if(this.flagMode)this.flag(p);else this.openCell(p);}
@@ -42,6 +46,7 @@ export class Game {
   openCell(p=this.board.selected){if(this.scene!=='PUZZLE'||this.pause||this.effects.remaining>0)return;this.accept(this.board.open(p));}
   flag(p=this.board.selected){if(this.scene!=='PUZZLE'||this.pause)return;this.accept(this.board.toggleFlag(p));}
   private accept(result:MoveResult){if(!result.ok){this.sound.play('step');return;}
+    if(result.discoveries?.length){this.activeFragmentId=result.discoveries[0];this.sound.play('memory');}
     this.effects.start(result.at??this.board.selected,result.kind??'open');
     if(result.kind==='explode'){this.sound.play('blast');this.sound.play('boss');this.change('EXPLOSION');}
     else if(result.kind==='win'){this.sound.play('breath');this.change('RETURN');}
@@ -94,7 +99,7 @@ export class Game {
   }
   private frame=(now:number)=>{const dt=this.previous?Math.min((now-this.previous)/1000,.1):0;this.previous=now;this.accumulator+=dt;while(this.accumulator>=1/60){this.update(1/60);this.accumulator-=1/60;}this.draw();requestAnimationFrame(this.frame);};
   private dialogue() {const a=this.art,l=this.currentLine();a.box(7,123,306,51,'#c5bfcb','#0a0b13');a.text(l.speaker,16,129,'#c3a68c',6);a.wrapped(l.text.slice(0,Math.floor(this.typed)),17,141,279,'#e9e3da',7,11);if(this.typed>=l.text.length&&Math.floor(this.time*2)%2)a.text('▼',301,162,'#bda4be',6);}
-  private puzzle(){this.renderer.draw(this.art,this.board,this.time,this.reduced,this.effects);}
+  private puzzle(){this.renderer.draw(this.art,this.board,this.time,this.reduced,this.effects,this.currentFragment);}
   private draw(){const a=this.art,c=a.c;c.globalAlpha=1;const scale=(this.canvas.width||320)/320;c.setTransform(scale,0,0,scale,0,0);a.rect(0,0,320,180,'#090912');
     if(!this.art.ready&&!['TITLE','SETTINGS'].includes(this.scene)){a.text('記憶の輪郭を、読み込んでいます。',160,82,'#d6bdcf',9,'center');return;}
     if(this.scene==='TITLE')return;
@@ -131,7 +136,7 @@ export class Game {
       }
       c.restore();
     }
-    else if(this.scene==='REPORT'){a.room(this.time);c.globalAlpha=.65;a.rect(0,0,320,180,'#0a0b15');c.globalAlpha=1;a.polygon([[62,9],[244,9],[259,24],[259,170],[62,170]],'#ddd1bb');a.polygon([[244,9],[244,24],[259,24]],'#afa38f');a.text('診 断 書',160,20,'#3a3541',11,'center');a.rect(77,38,165,1,'#ab9c8c');const lines=[['氏名　田辺 悠介（28）',48],['所見',66],['強い心理的負担に伴う心身の不調が',79],['認められる。職場での継続的な負荷が',90],['背景にある可能性があり、休養と',101],['継続的な評価が望ましい。',112],['院内医師確認済・署名　朝倉 灯',135]] as const;lines.forEach(([s,y],i)=>{const count=Math.max(0,Math.floor((this.sceneTime-i*.8-.5)*24));a.text(s.slice(0,count),78,y,'#403b47',7);});if(this.sceneTime>=8){a.box(222,132,24,24,'#ac4559','#ddd1bb');a.text('確認',234,136,'#ac4559',8,'center');a.text('済',234,145,'#ac4559',8,'center');a.text('架空のゲーム内文書',79,157,'#8a7b7c',4);}a.text(this.sceneTime>=9?'ENTER 書類を渡す':'ENTER 印字を完了',160,174,'#b9a8bb',5,'center');}
+    else if(this.scene==='REPORT'){a.room(this.time);c.globalAlpha=.65;a.rect(0,0,320,180,'#0a0b15');c.globalAlpha=1;a.polygon([[62,9],[244,9],[259,24],[259,170],[62,170]],'#ddd1bb');a.polygon([[244,9],[244,24],[259,24]],'#afa38f');a.text('診 断 書',160,20,'#3a3541',11,'center');a.rect(77,38,165,1,'#ab9c8c');const lines=[['氏名　田辺 悠介（28）',48],['所見',66],['強い心理的負担に伴う心身の不調が',79],['認められる。職場での継続的な負荷が',90],['背景にある可能性があり、休養と',101],['継続的な評価が望ましい。',112],['院内医師確認済・署名　朝倉 灯',135]] as const;lines.forEach(([s,y],i)=>{const count=Math.max(0,Math.floor((this.sceneTime-i*.8-.5)*24));a.text(s.slice(0,count),78,y,'#403b47',7);});if(this.sceneTime>=8){a.box(222,132,24,24,'#ac4559','#ddd1bb');a.text('確認',234,136,'#ac4559',8,'center');a.text('済',234,145,'#ac4559',8,'center');a.text(`聴取した記憶 ${this.board.foundFragments.length} / ${fragments.length}`,79,149,'#8a7b7c',4);a.text('架空のゲーム内文書',79,157,'#8a7b7c',4);}a.text(this.sceneTime>=9?'ENTER 書類を渡す':'ENTER 印字を完了',160,174,'#b9a8bb',5,'center');}
     else if(this.scene==='COMPLETE'){a.rect(0,0,320,180,'#10111b');a.rect(154,37,12,1,'#aa9475');a.text('SESSION COMPLETE',160,62,'#e7d3b7',13,'center');a.text('頭の中に、少し静けさが戻った。',160,91,'#b5a3bc',8,'center');a.text('整理することは、ここからも続いていく。',160,108,'#746c86',6,'center');a.text('ENTER タイトルへ',160,147,'#c3ac8b',6,'center');}
     if(this.pause){c.globalAlpha=.86;a.rect(0,0,320,180,'#090b15');c.globalAlpha=1;a.box(72,47,176,87,'#76647f','#11121e');a.text('PAUSED',160,61,'#ddcbb5',12,'center');a.text('急がなくて、大丈夫。',160,82,'#aa97b5',7,'center');a.text('ENTER / ESC 再開',160,102,'#d7bd9f',6,'center');a.text('R パズルを最初から    M 音',160,118,'#7e748c',5,'center');}
   }

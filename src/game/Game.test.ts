@@ -20,3 +20,16 @@ describe('マインスイーパーのセッション',()=>{
 
 it('患者への説明と了承を読み進めるまで、初回の潜行を始めない',()=>{const g=new Game(canvas);enter(g,0,false,true);tick(g,30);expect(g.scene).toBe('ANSWER');expect(g.board.generated).toBe(false);expect(g.currentLine().text).toContain('一緒に眺めて');for(let i=0;i<3;i++){press(g,'Enter');press(g,'Enter');}expect(g.currentLine().speaker).toBe('田辺 悠介');expect(g.currentLine().text).toContain('やってみたい');press(g,'Enter');expect(g.scene).toBe('DIVE');});
 it('相談からの再入場も言葉と3.8秒の遷移を挟み、ポーズ中は進まない',()=>{const g=new Game(canvas);enter(g);g.openInterview();g.answerInterview(0);g.resumeExploration();expect(g.sceneTime).toBe(0);expect(g.diveCaption).toContain('さっき話せたこと');press(g,'Escape');const t=g.sceneTime;tick(g,10);expect(g.sceneTime).toBe(t);press(g,'Escape');tick(g,3.6);expect(g.scene).toBe('DIVE');tick(g,.3);expect(g.scene).toBe('PUZZLE');});
+it('開封で患者の記憶が現れ、発見済みの記録だけを盤面を変えずに読み返せる',()=>{
+ const g=new Game(canvas);enter(g);g.openCell({x:4,y:5});tick(g,.2);
+ for(const c of g.board.cells.flat().filter(c=>!c.mine&&!c.open)){if(g.board.foundFragments.length>=2)break;g.openCell(c);tick(g,.2);}
+ expect(g.currentFragment).toBeDefined();expect(g.currentFragment!.patient.length).toBeGreaterThan(20);
+ const before=JSON.stringify(g.board);const found=g.board.foundFragments[0];g.readFragment(found);expect(g.currentFragment!.id).toBe(found);expect(JSON.stringify(g.board)).toBe(before);
+ const hidden=(['reprimand','notification','overtime'] as const).find(id=>!g.board.foundFragments.includes(id));if(hidden){g.readFragment(hidden);expect(g.currentFragment!.id).toBe(found);}
+});
+it('記憶を相談・帰還後も保持し、再挑戦で消去する',()=>{
+ const g=new Game(canvas);enter(g);g.openCell({x:4,y:5});tick(g,.2);counsel(g);
+ for(const c of g.board.cells.flat().filter(c=>!c.mine&&!c.open)){g.openCell(c);tick(g,.2);if(g.scene==='RETURN')break;}
+ expect(g.scene).toBe('RETURN');expect(g.board.foundFragments).toHaveLength(3);const found=g.board.foundFragments[1];g.readFragment(found);expect(g.currentFragment!.id).toBe(found);
+ tick(g,2.6);expect(g.board.foundFragments).toHaveLength(3);g.retry();expect(g.board.foundFragments).toHaveLength(0);expect(g.currentFragment).toBeUndefined();
+});

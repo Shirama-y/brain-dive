@@ -17,7 +17,7 @@ describe('カウンセリングの安全ヒント',()=>{
  it('盤面を開いたり作り直したりせず、安全な未開封マスを見せる',()=>{const b=new MinesweeperBoard(81);b.open(first);const cellsBefore=JSON.stringify(b.cells),opened=b.opened;const hint=b.counsel();expect(hint.ok).toBe(true);expect(b.tile(hint.at!)!.mine).toBe(false);expect(b.view(hint.at!)!.state).toBe('hint');expect(b.opened).toBe(opened);expect(JSON.stringify(b.cells)).toBe(cellsBefore);expect(b.message).toContain('安全ヒント');});
  it('最初の開封前のヒントも約束を守り、別の場所を初手に選んでも安全',()=>{for(let seed=0;seed<40;seed++){const b=new MinesweeperBoard(seed);b.selected={x:7,y:7};const hint=b.counsel();b.counsel();expect(b.hints.size).toBe(3);expect(b.generated).toBe(false);b.open({x:0,y:0});expect(b.tile(hint.at!)!.mine).toBe(false);expect(b.tile({x:0,y:0})!.mine).toBe(false);}});
  it('誤った旗で安全マスをすべて塞いでも、相談で旗を外して進める',()=>{const b=new MinesweeperBoard(6);b.open(first);for(const c of b.cells.flat().filter(c=>!c.open))b.toggleFlag(c);const hint=b.counsel();expect(hint.ok).toBe(true);expect(b.tile(hint.at!)!.flagged).toBe(false);expect(b.canOpen(hint.at!)).toBe(true);expect(b.tile(hint.at!)!.mine).toBe(false);});
- it('100種類の盤面すべてで、繰り返し相談するだけでも推測なしでクリアできる',()=>{for(let seed=0;seed<100;seed++){const b=new MinesweeperBoard(seed);for(let i=0;i<120&&!b.won;i++){const hint=b.counsel();expect(hint.ok).toBe(true);expect(b.open(hint.at!).ok).toBe(true);expect(b.failed).toBe(false);}expect(b.won,`seed ${seed}`).toBe(true);expect(b.opened).toBe(58);}});
+ it('100種類の盤面すべてで、繰り返し相談するだけでも推測なしでクリアできる',()=>{for(let seed=0;seed<100;seed++){const b=new MinesweeperBoard(seed);for(let i=0;i<120&&!b.won;i++){const hint=b.counsel();expect(hint.ok).toBe(true);expect(b.open(hint.at!).ok).toBe(true);expect(b.failed).toBe(false);}expect(b.won,`seed ${seed}`).toBe(true);expect(b.opened).toBe(58);expect(b.foundFragments).toHaveLength(3);}});
 });
 
 describe('気持ちと安心のつながり',()=>{
@@ -39,5 +39,46 @@ describe('気持ちと安心のつながり',()=>{
   b.counsel(1);expect(b.calm).toBe(0);b.open({x:0,y:0});
   const earlier=b.calm;for(const c of b.cells.flat().filter(c=>!c.mine))b.open(c);
   expect(b.calm).toBeGreaterThanOrEqual(earlier);expect(b.calm).toBe(100);expect(b.mood).toBe('少し落ち着いている');
+ });
+});
+
+describe('マスに隠れた記憶',()=>{
+ it('100種類の盤面で各領域に安全な記憶が1つずつあり、開くと一度だけ発見する',()=>{
+  for(let seed=0;seed<100;seed++){
+   const b=new MinesweeperBoard(seed),events:string[]=[];const firstMove=b.open(first);events.push(...(firstMove.discoveries??[]));
+   for(const c of b.cells.flat().filter(c=>!c.mine&&!c.open))events.push(...(b.open(c).discoveries??[]));
+   expect(events).toHaveLength(3);expect(new Set(events).size).toBe(3);expect(b.foundFragments).toEqual(events);
+   const memory=b.cells.flat().filter(c=>b.view(c)?.memoryId);expect(memory).toHaveLength(3);
+   expect(memory.every(c=>!c.mine&&c.open)).toBe(true);
+   expect(memory.find(c=>b.view(c)?.memoryId==='reprimand')!.y).toBeLessThan(3);
+   expect(memory.find(c=>b.view(c)?.memoryId==='notification')!.y).toBeGreaterThanOrEqual(3);
+   expect(memory.find(c=>b.view(c)?.memoryId==='notification')!.y).toBeLessThan(6);
+   expect(memory.find(c=>b.view(c)?.memoryId==='overtime')!.y).toBeGreaterThanOrEqual(6);
+   for(const c of memory)expect(b.open(c).discoveries).toBeUndefined();
+  }
+ });
+ it('未開封の記憶を表示へ漏らさず、空白の自動展開で開いた断片も取りこぼさない',()=>{
+  let floodFinds=0;
+  for(let seed=0;seed<30;seed++){
+   const b=new MinesweeperBoard(seed);expect(b.foundFragments).toHaveLength(0);b.counsel(1);expect(b.foundFragments).toHaveLength(0);
+   const r=b.open(first);floodFinds+=r.discoveries?.length??0;
+   expect(b.cells.flat().filter(c=>b.view(c)?.memoryId).length).toBe(b.foundFragments.length);
+   for(const c of b.cells.flat().filter(c=>!c.open))expect(b.view(c)).not.toHaveProperty('memoryId');
+  }
+  expect(floodFinds).toBeGreaterThan(0);
+ });
+ it('旗や相談だけでは発見せず、ヒントから実際に開いた時点で記録する',()=>{
+  const b=new MinesweeperBoard(81),reference=new MinesweeperBoard(81);b.open(first);reference.open(first);
+  for(const c of reference.cells.flat().filter(c=>!c.mine))reference.open(c);
+  const target=reference.cells.flat().find(c=>reference.view(c)?.memoryId&&!b.tile(c)!.open)!;
+  expect(target).toBeDefined();const before=[...b.foundFragments];b.toggleFlag(target);expect(b.open(target).ok).toBe(false);
+  b.counsel(target.y<3?0:target.y<6?1:2);expect(b.foundFragments).toEqual(before);
+  if(b.tile(target)!.flagged)b.toggleFlag(target);
+  const r=b.open(target);expect(r.discoveries).toContain(reference.view(target)!.memoryId);
+ });
+ it('地雷と失敗後の入力では記憶を増やさず、再挑戦の盤面には記録を持ち越さない',()=>{
+  const b=new MinesweeperBoard(7);b.open(first);const before=[...b.foundFragments];b.open(b.cells.flat().find(c=>c.mine)!);
+  expect(b.foundFragments).toEqual(before);b.counsel();b.open({x:0,y:0});expect(b.foundFragments).toEqual(before);
+  expect(new MinesweeperBoard(7).foundFragments).toHaveLength(0);
  });
 });
