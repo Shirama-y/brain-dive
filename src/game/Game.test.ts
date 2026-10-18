@@ -1,8 +1,8 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import {Game} from './Game';
 let win:EventTarget,canvas:HTMLCanvasElement;
-beforeEach(()=>{win=new EventTarget();const context=new Proxy({measureText:(s:string)=>({width:s.length*7})},{get:(obj,k)=>k in obj?obj[k as keyof typeof obj]:(()=>{})});canvas=Object.assign(new EventTarget(),{getContext:()=>context}) as unknown as HTMLCanvasElement;vi.stubGlobal('window',win);vi.stubGlobal('document',Object.assign(new EventTarget(),{activeElement:canvas,querySelector:()=>({textContent:''})}));vi.stubGlobal('requestAnimationFrame',vi.fn());vi.stubGlobal('localStorage',{getItem:()=>null,setItem:vi.fn()});});
-afterEach(()=>vi.unstubAllGlobals());
+beforeEach(()=>{vi.spyOn(Date,'now').mockReturnValue(81);win=new EventTarget();const context=new Proxy({measureText:(s:string)=>({width:s.length*7})},{get:(obj,k)=>k in obj?obj[k as keyof typeof obj]:(()=>{})});canvas=Object.assign(new EventTarget(),{getContext:()=>context}) as unknown as HTMLCanvasElement;vi.stubGlobal('window',win);vi.stubGlobal('document',Object.assign(new EventTarget(),{activeElement:canvas,querySelector:()=>({textContent:''})}));vi.stubGlobal('requestAnimationFrame',vi.fn());vi.stubGlobal('localStorage',{getItem:()=>null,setItem:vi.fn()});});
+afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
 function tick(g:Game,dt=1/60){(g as unknown as {update(dt:number):void}).update(dt);}
 function press(g:Game,code:string){for(const type of ['keydown','keyup'])win.dispatchEvent(Object.assign(new Event(type),{code,repeat:false}));tick(g);}
 function enter(g:Game,choice=0,skip=true){press(g,'Enter');tick(g,3.1);for(let i=0;i<3;i++){press(g,'Enter');press(g,'Enter');}expect(g.scene).toBe('QUESTION');for(let i=0;i<choice;i++)press(g,'ArrowDown');press(g,'Enter');for(let i=0;i<2;i++){press(g,'Enter');press(g,'Enter');}expect(g.scene).toBe('DIVE');if(skip)press(g,'Enter');}

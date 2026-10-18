@@ -46,7 +46,7 @@ export class Game {
     else this.sound.play(result.kind==='flag'?'step':'dig');
   }
   openInterview(){if(this.scene!=='PUZZLE'||this.pause||this.board.finished)return;this.interviewAnswer='';this.selected=0;this.change('INTERVIEW');}
-  answerInterview(index:number){if(this.scene!=='INTERVIEW'||this.pause||this.interviewAnswer)return;const q=counselingQuestions[index];if(!q)return;const result=this.board.counsel();if(!result.ok)return;this.interviewAnswer=`${q.answer} ${result.message}`;this.interviewPoint=result.at!;this.typed=0;this.sound.play('memory');}
+  answerInterview(index:number){if(this.scene!=='INTERVIEW'||this.pause||this.interviewAnswer)return;const q=counselingQuestions[index];if(!q)return;const result=this.board.counsel(index);if(!result.ok)return;this.interviewAnswer=`${q.answer} ${result.message}`;this.interviewPoint=result.at!;this.typed=0;this.sound.play('memory');}
   resumeExploration(){if(this.scene!=='INTERVIEW'||this.pause||!this.interviewAnswer)return;this.flagMode=false;this.change('DIVE');this.sceneTime=2.9;this.effects.start(this.interviewPoint,'hint');}
   currentLine(){if(this.scene==='DIALOGUE')return intro[this.line];if(this.scene==='ANSWER')return {speaker:'田辺 悠介',text:this.line===0?replies[this.question]:lastLine};if(this.scene==='OUTRO')return outro[this.line];return {speaker:'',text:''};}
   advance(){const current=this.currentLine();if(this.typed<current.text.length){this.typed=current.text.length;return;}this.sound.play('confirm');if(this.scene==='DIALOGUE'){if(++this.line>=intro.length){this.selected=0;this.change('QUESTION');}else this.typed=0;}else if(this.scene==='ANSWER'){if(++this.line>1){this.sound.play('dive');this.change('DIVE');}else this.typed=0;}else if(this.scene==='OUTRO'){if(++this.line>=outro.length){this.stampPlayed=false;this.change('REPORT');}else this.typed=0;}}
@@ -68,7 +68,7 @@ export class Game {
     if(this.scene==='DIVE'){if(confirm(key))this.change('PUZZLE');return;}
     if(this.scene==='PUZZLE'){
       if(key==='KeyR'){this.retry();return;}if(key==='KeyF'){this.flag();return;}if(key==='KeyQ'||key==='KeyH'){this.openInterview();return;}
-      if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(key)){const p=this.board.selected;this.selectTile({x:Math.max(0,Math.min(9,p.x+(key==='ArrowLeft'?-1:key==='ArrowRight'?1:0))),y:Math.max(0,Math.min(11,p.y+(key==='ArrowUp'?-1:key==='ArrowDown'?1:0)))});}
+      if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(key)){const p=this.board.selected;this.selectTile({x:Math.max(0,Math.min(this.board.width-1,p.x+(key==='ArrowLeft'?-1:key==='ArrowRight'?1:0))),y:Math.max(0,Math.min(this.board.height-1,p.y+(key==='ArrowUp'?-1:key==='ArrowDown'?1:0)))});}
       if(confirm(key))this.openCell();return;
     }
     if(this.scene==='REPORT'&&confirm(key)){if(this.sceneTime<9)this.sceneTime=9;else this.change('COMPLETE');return;}

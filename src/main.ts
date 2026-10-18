@@ -5,6 +5,7 @@ import {questions} from './data/story';
 import {counselingQuestions} from './data/counseling';
 import {MAP,NUMBER_COLORS} from './render/MinesweeperRenderer';
 import {Game} from './game/Game';
+import {WIDTH,HEIGHT,FEELINGS,feelingAt} from './minesweeper/Board';
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const canvas=element<HTMLCanvasElement>('game'),viewport=element('viewport'),consoleElement=document.querySelector<HTMLElement>('.console')!;
 const game=new Game(canvas),mapRoot=element('map-controls'),mobileRoot=element('mobile-minefield');
@@ -12,7 +13,7 @@ const focus=()=>game.scene==='TITLE'?element('start-game').focus({preventScroll:
 const action=(fn:()=>void)=>()=>{game.sound.unlock();fn();consoleElement.setAttribute('aria-busy',String(game.effects.remaining>0));focus();};
 bindTouchControls(element('touch-controls'),game.input,focus,()=>game.sound.unlock());
 const grids=[mapRoot,mobileRoot];
-for(const root of grids){for(let y=0;y<12;y++)for(let x=0;x<10;x++){const button=document.createElement('button');button.dataset.x=String(x);button.dataset.y=String(y);button.type='button';root.append(button);}
+for(const root of grids){for(let y=0;y<HEIGHT;y++)for(let x=0;x<WIDTH;x++){const button=document.createElement('button');button.dataset.x=String(x);button.dataset.y=String(y);button.type='button';root.append(button);}
  bindMapControls(root,p=>game.selectTile(p),p=>action(()=>game.tap(p))(),p=>action(()=>game.flag(p))());}
 const mapButtons=grids.map(root=>Array.from(root.querySelectorAll<HTMLButtonElement>('button')));
 const mobile=window.matchMedia('(max-width:800px), (pointer:coarse)');
@@ -31,11 +32,11 @@ function updateUI(){const b=game.board,puzzle=game.scene==='PUZZLE'&&!game.pause
  syncPresentation();setText('title-sound',game.sound.muted?'音楽 OFF':'音楽 ON');element('title-sound').setAttribute('aria-pressed',String(!game.sound.muted));
  element('minesweeper-ui').hidden=!puzzle;element('interview-panel').hidden=!interview;element('gameover-panel').hidden=!over;mapRoot.hidden=!puzzle;
  const optionLabels:string[]=[];
- for(let i=0;i<120;i++){const p={x:i%10,y:Math.floor(i/10)},v=b.view(p)!;const stateLabel=v.state==='open'?(v.adjacent?`周囲の地雷 ${v.adjacent}`:'空白'):v.state==='flagged'?'旗':v.state==='hint'?'安全ヒント':['mine','exploded'].includes(v.state)?'地雷':'未開封';const label=`${p.x+1}列${p.y+1}行 ${stateLabel}`;optionLabels.push(label);
-  mapButtons.forEach((buttons,index)=>{const button=buttons[i];if(button.getAttribute('aria-label')!==label)button.setAttribute('aria-label',label);button.disabled=b.finished;button.setAttribute('aria-pressed',String(b.selected.x===p.x&&b.selected.y===p.y));if(index===1){const text=v.state==='open'?(v.adjacent?String(v.adjacent):''):v.state==='flagged'?'⚑':v.state==='hint'?'◇':['mine','exploded'].includes(v.state)?'✹':'';if(button.textContent!==text)button.textContent=text;button.dataset.state=v.state;button.style.color=NUMBER_COLORS[v.adjacent??0];}});
+ for(let i=0;i<WIDTH*HEIGHT;i++){const p={x:i%WIDTH,y:Math.floor(i/WIDTH)},v=b.view(p)!;const stateLabel=v.state==='open'?(v.adjacent?`周囲の地雷 ${v.adjacent}`:'空白'):v.state==='flagged'?'旗':v.state==='hint'?'安全ヒント':['mine','exploded'].includes(v.state)?'地雷':'未開封';const label=`${p.x+1}列${p.y+1}行 ${FEELINGS[feelingAt(p)]} ${stateLabel}`;optionLabels.push(label);
+  mapButtons.forEach((buttons,index)=>{const button=buttons[i];if(button.getAttribute('aria-label')!==label)button.setAttribute('aria-label',label);button.disabled=b.finished;button.setAttribute('aria-pressed',String(b.selected.x===p.x&&b.selected.y===p.y));if(index===1){const text=v.state==='open'?(v.adjacent?String(v.adjacent):''):v.state==='flagged'?'⚑':v.state==='hint'?'◇':['mine','exploded'].includes(v.state)?'✹':'';if(button.textContent!==text)button.textContent=text;button.dataset.state=v.state;button.dataset.feeling=String(feelingAt(p));button.style.color=NUMBER_COLORS[v.adjacent??0];}});
  }
- const signature=optionLabels.join('|'),picker=element<HTMLSelectElement>('target-picker');if(signature!==pickerSignature){pickerSignature=signature;picker.replaceChildren(...optionLabels.map((label,i)=>new Option(label,`${i%10},${Math.floor(i/10)}`)));}picker.value=`${b.selected.x},${b.selected.y}`;
- setText('puzzle-status',`安全 ${b.opened} / ${b.safeTotal} マス · 地雷 ${b.mineCount} · 旗 ${b.flags}`);setText('tile-description',b.describe(b.selected));setText('puzzle-message',b.message);
+ const signature=optionLabels.join('|'),picker=element<HTMLSelectElement>('target-picker');if(signature!==pickerSignature){pickerSignature=signature;picker.replaceChildren(...optionLabels.map((label,i)=>new Option(label,`${i%WIDTH},${Math.floor(i/WIDTH)}`)));}picker.value=`${b.selected.x},${b.selected.y}`;
+ setText('puzzle-status',`安心 ${b.calm}% · 開いたマス ${b.opened}/${b.safeTotal} · 不安の核 ${b.mineCount}`);setText('mind-state',`${b.mood} — 「${b.voice}」`);setText('support-size',`話を聞く · 安全${b.supportSize}マス`);setText('tile-description',b.describe(b.selected));setText('puzzle-message',b.message);
  element<HTMLButtonElement>('open-action').disabled=!b.canOpen(b.selected)||game.effects.remaining>0;element<HTMLButtonElement>('flag-action').disabled=!!b.tile(b.selected)?.open;setText('flag-action',b.tile(b.selected)?.flagged?'旗を外す':'旗を立てる');setText('tap-mode',game.flagMode?'マスタップ：旗を立てる / 外す':'マスタップ：開く');element('tap-mode').setAttribute('aria-pressed',String(game.flagMode));
  element('interview-questions').hidden=!!game.interviewAnswer;setText('interview-caption',game.interviewAnswer.slice(0,Math.floor(game.typed)));element<HTMLButtonElement>('resume-action').disabled=!game.interviewAnswer;
  setText('failure-status',`開いた安全なマス：${b.opened} / ${b.safeTotal}。再挑戦では盤面を作り直します。`);

@@ -1,5 +1,7 @@
 import {keyOf,type Point,type Cell,type CellView,type MoveResult} from './types';
-export const WIDTH=10,HEIGHT=12,MINE_COUNT=18;
+export const WIDTH=8,HEIGHT=8,MINE_COUNT=6;
+export const FEELINGS=['叱責の記憶','自分を責める声','疲れ'];
+export const feelingAt=(p:Point)=>p.y<3?0:p.y<6?1:2;
 /** Pure Minesweeper model. Hidden mine locations never enter the UI projection. */
 export class MinesweeperBoard {
  readonly width=WIDTH;readonly height=HEIGHT;readonly mineCount=MINE_COUNT;
@@ -10,6 +12,10 @@ export class MinesweeperBoard {
  constructor(seed=Date.now()){this.randomState=seed>>>0;}
  tile(p:Point){return this.cells[p.y]?.[p.x];}
  neighbors(p:Point){const result:Cell[]=[];for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const c=this.tile({x:p.x+dx,y:p.y+dy});if(c)result.push(c);}return result;}
+ get supportSize(){return Math.min(7,3+this.counselings*2);}
+ get calm(){return Math.round(this.opened/this.safeTotal*100);}
+ get mood(){return this.calm<35?'緊張している':this.calm<75?'呼吸が整ってきた':'少し落ち着いている';}
+ get voice(){return this.calm<35?'また叱られる気がして、胸が苦しいです。':this.calm<75?'ひとつずつなら、向き合えそうです。':'全部を自分のせいにしなくても、いいのかもしれません。';}
  get safeTotal(){return this.width*this.height-this.mineCount;}
  get opened(){return this.cells.flat().filter(c=>c.open&&!c.mine).length;}
  get flags(){return this.cells.flat().filter(c=>c.flagged).length;}
@@ -35,7 +41,7 @@ export class MinesweeperBoard {
   if(v.state==='flagged')return v.wrongFlag?'安全なマスに置かれていた旗です。':'旗：地雷と思う場所の印。旗を外すまで開きません。';
   if(v.state==='hint')return '安全ヒント：カウンセリングで見えた、地雷のないマスです。開いて大丈夫。';
   if(v.state==='open')return v.adjacent?`周囲8マスに地雷が ${v.adjacent} 個あります。斜めも数えます。`:'周囲8マスに地雷はありません。';
-  return this.generated?'未開封：数字を手がかりに開くか、地雷と思う場所に旗を立てましょう。':'未開封：最初に開くマスとその周囲には地雷を置きません。';
+  return `${FEELINGS[feelingAt(p)]}：未開封。数字は近くの不安の核の数。迷ったら話を聞き、金色の安心マスを開きましょう。最初の一手は安全です。`;
  }
  private result(r:MoveResult){this.message=r.message;return r;}
  open(p:Point):MoveResult{
@@ -49,17 +55,22 @@ export class MinesweeperBoard {
  toggleFlag(p:Point):MoveResult{const c=this.tile(p);this.selected={x:p.x,y:p.y};if(!c||c.open||this.finished)return {ok:false,message:'未開封のマスに旗を立てられます。'};
   c.flagged=!c.flagged;return this.result({ok:true,kind:'flag',at:{x:p.x,y:p.y},message:c.flagged?'旗を立てた。旗は印なので、正解とは限りません。':'旗を外した。このマスを開けるようになりました。'});
  }
- counsel():MoveResult{
+ counsel(topic=0):MoveResult{
   if(this.finished)return {ok:false,message:'再挑戦してからカウンセリングを行ってください。'};
-  this.counselings++;
-  // Before the first reveal, promise one safe cell without generating or leaking a board.
-  if(!this.generated){const existing=[...this.hints][0];let target=existing?this.cells.flat().find(c=>keyOf(c)===existing)!:this.tile(this.selected)??this.cells[5][4];this.hints.add(keyOf(target));target.flagged=false;this.selected={x:target.x,y:target.y};return this.hintResult(target);}
-  const safe=this.cells.flat().filter(c=>!c.mine&&!c.open&&!this.hints.has(keyOf(c)));
-  // Prefer the frontier next to numbers, but guarantee a hint even behind mistaken flags.
-  safe.sort((a,b)=>Number(a.flagged)-Number(b.flagged)||Number(this.neighbors(b).some(n=>n.open))-Number(this.neighbors(a).some(n=>n.open))||Math.abs(a.x-this.selected.x)+Math.abs(a.y-this.selected.y)-Math.abs(b.x-this.selected.x)-Math.abs(b.y-this.selected.y));
-  const target=safe[0]??this.cells.flat().find(c=>!c.mine&&!c.open);
-  if(!target)return {ok:false,message:'安全なマスはすべて開いています。'};
-  this.hints.add(keyOf(target));target.flagged=false;this.selected={x:target.x,y:target.y};return this.hintResult(target);
+  topic=Math.max(0,Math.min(2,Math.floor(topic)));const count=this.supportSize;this.counselings++;
+  // Before generation, repeat the existing promise so six mine slots always remain available.
+  const existing=[...this.hints].map(k=>this.cells.flat().find(c=>keyOf(c)===k)!).filter(c=>!c.open);
+  let targets:Cell[];
+  if(!this.generated&&existing.length)targets=existing;
+  else {
+   const safe=this.cells.flat().filter(c=>!c.open&&!c.mine&&!this.hints.has(keyOf(c)));
+   safe.sort((a,b)=>Number(feelingAt(b)===topic)-Number(feelingAt(a)===topic)||Number(a.flagged)-Number(b.flagged)||Number(this.neighbors(b).some(n=>n.open))-Number(this.neighbors(a).some(n=>n.open))||Math.abs(a.x-this.selected.x)+Math.abs(a.y-this.selected.y)-Math.abs(b.x-this.selected.x)-Math.abs(b.y-this.selected.y));
+   targets=safe.slice(0,count);
+   if(!targets.length)targets=this.cells.flat().filter(c=>!c.mine&&!c.open).slice(0,count);
+  }
+  if(!targets.length)return {ok:false,message:'安心できるマスはすべて開いています。'};
+  for(const c of targets){this.hints.add(keyOf(c));c.flagged=false;}
+  const c=targets[0];this.selected={x:c.x,y:c.y};
+  return this.result({ok:true,kind:'hint',at:{x:c.x,y:c.y},message:`「${FEELINGS[topic]}」について話せた。安全ヒント：金色の ${targets.length} マスは安心して開けます。${c.x+1}列${c.y+1}行から。相談を重ねると最大7マス見えてきます。`});
  }
- private hintResult(c:Cell){return this.result({ok:true,kind:'hint',at:{x:c.x,y:c.y},message:`安全ヒント：${c.x+1}列${c.y+1}行。金色のマスには地雷がありません。旗があれば外しました。`});}
 }
