@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/><meta name="theme-color" content="#101115"/><meta name="description" content="混ざり合った声と記憶をほどく、短編心理パズル。BRAIN DIVE — 診断書"/><title>BRAIN DIVE — 診断書</title>  <script type="module" crossorigin src="./assets/index-Dkoo4cY3.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CBbm9ep9.css">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/><meta name="theme-color" content="#101115"/><meta name="description" content="混ざり合った声と記憶をほどく、短編心理パズル。BRAIN DIVE — 診断書"/><title>BRAIN DIVE — 診断書</title>  <script type="module" crossorigin src="./assets/index-C6uCbBvU.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BG-QvpLz.css">
 </head>
 <body>
 <div class="shell">
@@ -9,25 +9,27 @@
 <main>
 <section class="hero" aria-label="BRAIN DIVE — 診断書">
 <img class="hero-art" src="./assets/brain-dive-keyvisual.png" alt="青年の横顔から神経と無数の目がほどける、夜の脳内風景" width="1536" height="864" fetchpriority="high"/>
-<div class="hero-copy"><span class="eyebrow">A SHORT PSYCHOLOGICAL PUZZLE</span><h1><span>BRAIN</span><span>DIVE</span></h1><div class="hero-subtitle">— 診 断 書 —</div><p>その声は、<br/>あなたのものですか。</p><div class="hero-actions"><button id="play-music">音楽ありではじめる <span>→</span></button><button id="play-silent">無音でプレイ</button></div><span class="headphone-note">HEADPHONES RECOMMENDED / 約10分</span></div>
+<div class="hero-copy"><span class="eyebrow">A PSYCHOLOGICAL EXPLORATION</span><h1><span>BRAIN</span><span>DIVE</span></h1><div class="hero-subtitle">— 診 断 書 —</div><p>その声は、<br/>あなたのものですか。</p><div class="hero-actions"><button id="play-music">音楽ありではじめる <span>→</span></button><button id="play-silent">無音でプレイ</button></div><span class="headphone-note">HEADPHONES RECOMMENDED / MIND EXCAVATION</span></div>
 <div class="hero-case">症例 01<strong>月曜の朝</strong><span>田辺 悠介 / 28歳</span></div>
 </section>
 <div class="session-heading"><span>THE SESSION</span><p>混ざり合った声と記憶を、ほどいていく。</p><span>CASE 001</span></div>
-<section id="session" class="console" aria-label="BRAIN DIVE ゲーム"><div class="console-top"><span><i></i> <b id="scene-label">BRAIN DIVE / 待合室</b></span><span>BRAIN DIVE <span class="top-divider">/</span> VISUAL NOVEL</span></div><div class="viewport" id="viewport"><canvas id="game" width="960" height="540" tabindex="0" aria-label="BRAIN DIVE。Enterで開始。矢印で移動、Xで回転、Spaceで落下。"></canvas><div class="scanlines" aria-hidden="true"></div></div><div id="touch-controls" class="touch-controls" aria-label="タッチ操作">
+<section id="session" class="console" aria-label="BRAIN DIVE ゲーム"><div class="console-top"><span><i></i> <b id="scene-label">BRAIN DIVE / 待合室</b></span><span>BRAIN DIVE <span class="top-divider">/</span> VISUAL NOVEL</span></div><div class="viewport" id="viewport"><canvas id="game" width="960" height="540" tabindex="0" aria-label="BRAIN DIVE。Enterで開始。クリック・タップで掘削。Oで観察、Cで記憶、Qで問診。"></canvas><div id="map-controls" class="map-controls" role="group" aria-label="脳内探索マップ" hidden></div><div class="scanlines" aria-hidden="true"></div></div><div id="touch-controls" class="touch-controls" aria-label="タッチ操作">
 <div id="mobile-caption" class="mobile-caption" aria-live="off"></div>
 <div class="touch-menu" id="touch-menu">
 <button data-key="ArrowUp" aria-label="上の項目">↑</button><button data-key="ArrowDown" aria-label="下の項目">↓</button>
 <button data-key="ArrowLeft" aria-label="音量を下げる">−</button><button data-key="ArrowRight" aria-label="音量を上げる">＋</button>
 <button data-key="Enter" class="touch-primary" id="touch-confirm">決定 / 次へ</button>
 </div>
-<div class="touch-puzzle" id="touch-puzzle" hidden>
-<div class="touch-row"><button data-key="ArrowLeft" aria-label="左へ移動">←</button><button data-key="ArrowDown" aria-label="速く落下">↓<small>速く</small></button><button data-key="ArrowRight" aria-label="右へ移動">→</button><button data-key="KeyZ" aria-label="左回転">↶<small>回転</small></button><button data-key="KeyX" aria-label="右回転">↷<small>回転</small></button></div>
-<div class="touch-row"><button data-key="KeyH">ヒント</button><button data-key="Space" class="touch-primary">落とす</button></div>
-</div>
-<div class="touch-tools"><button data-key="Escape" id="touch-pause">一時停止</button><button data-key="KeyR" id="touch-retry" hidden>再挑戦</button><span>長押しで連続移動・落下</span></div>
-</div><div class="console-bottom"><span><span class="live-dot"></span><span id="state-label">SESSION READY</span></span><div><button id="puzzle-mode" aria-label="パズルモードを切り替え">思考モード</button><button id="sound" aria-label="音の切り替え">SOUND OFF</button><button id="fullscreen">⛶ FULLSCREEN</button></div></div></section>
-<div class="below"><p>心を治すのではなく、<br/><span>混ざり合った声と記憶を、分けていく。</span></p><div class="controls"><span><kbd>←</kbd><kbd>→</kbd> 移動</span><span><kbd>↑</kbd><kbd>X</kbd> 回転</span><span><kbd>SPACE</kbd> 決定 / 落下</span><span><kbd>ESC</kbd> ポーズ</span><button id="help">操作ガイド ↗</button></div></div>
-<details id="guide"><summary>遊び方・アクセシビリティ</summary><div class="guide-grid"><p>灰色の記憶の塊の隣で、同じ感情を縦・横に4つ消します。高さの違う6つの塊は足場にもなります。隣接消去2回で封印がほどけ、塊を取り除くと診断が進みます。2・4・6個の解放で記憶が現れ、上司の声がおじゃまを増やします。3枚そろうと「怒り」が解禁。橙色の怒りを、右下の黒い核の隣に着地させてください。</p><p>会話は Enter / Z / Space、質問は ↑ ↓ で選択。パズルは Z で逆回転、↓ で速く落下、H で一度だけヒント、R で再挑戦。設定で音量と動きの軽減を変更できます。スマートフォンでは画面下のボタンで同じ操作ができます。左右と「速く」は長押しできます。セーブはありません。</p></div></details>
+<div class="touch-tools"><button data-key="Escape" id="touch-pause">一時停止</button><button data-key="KeyR" id="touch-retry" hidden>再挑戦</button><span>探索した道は問診後も残ります</span></div>
+</div><section id="excavation-ui" class="excavation-ui" aria-label="探索操作" hidden>
+<p id="exploration-status" aria-live="polite"></p><p id="tile-description"></p><label class="target-picker">対象を選ぶ（小さいマスを押しづらいとき）<select id="target-picker" aria-label="探索対象を選ぶ"></select></label>
+<div class="excavation-actions"><button id="dig-action">掘る <small>Enter / −1</small></button><button id="observe-action">観察 <small>O / −1</small></button><button id="memory-action">記憶 <small>C / 無料</small></button><button id="interview-action">問診 <small>Q / 回復</small></button></div>
+<p id="exploration-message" class="feedback" role="status"></p></section>
+<section id="cards-panel" class="interaction-panel" aria-label="記憶の整理" hidden><h2>記憶を結びつける</h2><p>記録された出来事、他者の言葉、そこから生まれた解釈を分けてみましょう。何度でも選び直せます。</p><div id="card-list" class="card-list"></div><button id="classify-action">3つの記憶を分類する</button><div id="source-puzzle" hidden><h3>言葉の出どころ</h3><p>上司の声と、自分の中で生まれた解釈。それぞれ、どの記憶でしょう。</p><label>上司からの言葉 <select id="boss-card"><option value="0">選択してください</option></select></label><label>本人が生んだ解釈 <select id="self-card"><option value="0">選択してください</option></select></label><button id="connect-action">出どころを結びつける</button></div><p id="cards-message" class="feedback" role="status"></p><button id="close-cards">探索に戻る</button></section>
+<section id="interview-panel" class="interaction-panel" aria-label="追加の問診" hidden><h2>少し、話を聞いてみましょう</h2><p>質問に正誤はありません。どの質問でも集中力が回復します。手がかりが必要なら、関係する場面について尋ねてください。</p><div id="interview-questions"></div><p id="interview-caption" aria-live="off"></p><button id="resume-action">探索を再開する</button></section>
+<div class="console-bottom"><span><span class="live-dot"></span><span id="state-label">SESSION READY</span></span><div><button id="pause-action">一時停止</button><span class="system-label">MIND EXCAVATION</span><button id="sound" aria-label="音の切り替え">SOUND OFF</button><button id="fullscreen">⛶ FULLSCREEN</button></div></div></section>
+<div class="below"><p>心を壊すのではなく、<br/><span>知らなかった記憶のつながりを、見つけていく。</span></p><div class="controls"><span>クリック / タップ 掘る</span><span><kbd>O</kbd> 観察</span><span><kbd>C</kbd> 記憶</span><span><kbd>Q</kbd> 問診</span><button id="help">操作ガイド ↗</button></div></div>
+<details id="guide"><summary>遊び方・アクセシビリティ</summary><div class="guide-grid"><p>光の縁があるマスをクリック・タップして掘ります。通路に上下左右で隣接するマスだけ掘れます。隠れた通路は選んで「観察」。防衛を選ぶと必要な手がかりを確認できます。未発見のマスの内容は表示されません。</p><p>掘削・観察は集中力を1消費します。「問診」で回復でき、掘った通路や記憶は残ります。「記憶」で3枚を分類し、奥の残響で言葉の出どころを結びつけてください。カード閲覧・整理は無料です。矢印で対象選択、Enterで掘る、右クリック / Oで観察、Cで記憶、Qで問診、Escでポーズ、Rで探索を最初から。設定で音量・演出軽減を変更できます。進行セーブはありません。</p></div></details>
 </main><footer><span>BRAIN DIVE <span class="footer-dash">—</span> 診断書</span><span>FICTIONAL CASE / ORIGINAL PIXEL ART</span><span>ORIGINAL SCORE &amp; PIXEL ART</span></footer>
 </div>
 </body></html>

@@ -1,40 +1,60 @@
-import { Art, COLORS, NAMES } from '../render/Art';
-import { Board, pieceCells } from '../puzzle/Board';
-import { FALL_SECONDS, SOFT_SECONDS, type Emotion } from '../puzzle/level01';
-import { intro, questions, replies, lastLine, memories, outro } from '../data/story';
+import { Art } from '../render/Art';
+import { ExcavationBoard } from '../excavation/ExcavationBoard';
+import { ExcavationRenderer } from '../render/ExcavationRenderer';
+import { ExcavationEffects } from '../render/ExcavationEffects';
+import { memoryCards, interviewQuestions } from '../data/memory01';
+import type { Point, Category } from '../excavation/TileTypes';
+import type { ActionResult } from '../excavation/ExcavationBoard';
+import { intro, questions, replies, lastLine, outro } from '../data/story';
 import { Input } from './Input';
 import { Sound } from './Audio';
-type Scene = 'TITLE'|'SETTINGS'|'ROOM_INTRO'|'DIALOGUE'|'QUESTION'|'ANSWER'|'DIVE'|'PUZZLE'|'MEMORY'|'RETURN'|'OUTRO'|'REPORT'|'COMPLETE';
-const confirm=(key:string)=>['Enter','Space','KeyZ'].includes(key);
-const labels:Record<Scene,string>={TITLE:'待合室',SETTINGS:'設定',ROOM_INTRO:'患者入室',DIALOGUE:'問診',QUESTION:'問診',ANSWER:'問診',DIVE:'潜行中',PUZZLE:'月曜の朝',MEMORY:'記憶の断片',RETURN:'帰還中',OUTRO:'診療室',REPORT:'診断書',COMPLETE:'セッション終了'};
+type Scene = 'TITLE'|'SETTINGS'|'ROOM_INTRO'|'DIALOGUE'|'QUESTION'|'ANSWER'|'DIVE'|'PUZZLE'|'CARDS'|'INTERVIEW'|'MEMORY'|'RETURN'|'OUTRO'|'REPORT'|'COMPLETE';
+const confirm=(key:string)=>['Enter','Space'].includes(key);
+const labels:Record<Scene,string>={TITLE:'待合室',SETTINGS:'設定',ROOM_INTRO:'患者入室',DIALOGUE:'問診',QUESTION:'問診',ANSWER:'問診',DIVE:'潜行中',PUZZLE:'月曜の朝',MEMORY:'記憶の断片',CARDS:'記憶の整理',INTERVIEW:'追加の問診',RETURN:'帰還中',OUTRO:'診療室',REPORT:'診断書',COMPLETE:'セッション終了'};
 export class Game {
   art:Art; input:Input; sound=new Sound();
   scene:Scene='TITLE'; sceneTime=0; time=0; selected=0; question=0; line=0; typed=0;
-  timed=false;
-  reduced=true; pause=false; board=new Board(); dropTime=0; resolveTime=0; memory=1;
-  hintUsed=false; hintText=''; hintTime=0; titleSelected=0; settingsSelected=0;
-  private impact=0; private releaseGlow=0; private bossFlash=0; private lastGlyph=0;
+  reduced=true; pause=false; board=new ExcavationBoard(); memory=1;
+  renderer=new ExcavationRenderer();effects=new ExcavationEffects();
+  assignments:Partial<Record<number,Category>>={};bossCard=0;selfCard=0;
+  interviewAnswer='';private interviewPoint:Point={x:8,y:4};private memoryReturn:'PUZZLE'|'CARDS'='PUZZLE';
+  titleSelected=0; settingsSelected=0;private lastGlyph=0;
   private previous=0; private accumulator=0; private stampPlayed=false;
   constructor(public canvas:HTMLCanvasElement) {
     this.art=new Art(canvas.getContext('2d')!);this.input=new Input(canvas);
-    try{const s=JSON.parse(localStorage.getItem('brain-dive-settings')??'{}');this.timed=s.timed===true;this.reduced=typeof s.reduced==='boolean'?s.reduced:true;this.sound.muted=typeof s.muted==='boolean'?s.muted:false;this.sound.volume=typeof s.volume==='number'?Math.max(0,Math.min(1,s.volume)):.45;}catch{/* Storage can be disabled. */}
+    try{const s=JSON.parse(localStorage.getItem('brain-dive-settings')??'{}');this.reduced=typeof s.reduced==='boolean'?s.reduced:true;this.sound.muted=typeof s.muted==='boolean'?s.muted:false;this.sound.volume=typeof s.volume==='number'?Math.max(0,Math.min(1,s.volume)):.45;}catch{/* Storage can be disabled. */}
     window.addEventListener('blur',()=>{if(!['TITLE','SETTINGS','COMPLETE'].includes(this.scene)){this.pause=true;}});
     document.addEventListener('visibilitychange',()=>{if(document.hidden&&!['TITLE','SETTINGS','COMPLETE'].includes(this.scene))this.pause=true;});
     canvas.addEventListener('pointerdown',()=>{this.sound.unlock();canvas.focus();});
     window.addEventListener('keydown',()=>{if(document.activeElement===canvas)this.sound.unlock();});this.change('TITLE');requestAnimationFrame(this.frame);
   }
-  save(){try{localStorage.setItem('brain-dive-settings',JSON.stringify({timed:this.timed,reduced:this.reduced,muted:this.sound.muted,volume:this.sound.volume}));}catch{}this.syncSound();}
+  save(){try{localStorage.setItem('brain-dive-settings',JSON.stringify({reduced:this.reduced,muted:this.sound.muted,volume:this.sound.volume}));}catch{}this.syncSound();}
   syncSound(){document.querySelector('#sound')!.textContent=this.sound.muted?'SOUND OFF':'SOUND ON';}
-  toggleMode(){this.timed=!this.timed;this.dropTime=0;this.save();}
   toggleSound(){this.sound.unlock();this.sound.muted=!this.sound.muted;this.save();}
-  change(scene:Scene) {this.scene=scene;if(scene==='MEMORY')this.sound.play('memory');if(scene==='RETURN')this.sound.play('win');this.sceneTime=0;this.typed=0;this.input.clear();this.dropTime=0;document.querySelector('#scene-label')!.textContent=`BRAIN DIVE / ${labels[scene]}`;document.querySelector('#state-label')!.textContent=scene==='TITLE'?'SESSION READY':scene==='COMPLETE'?'SESSION COMPLETE':`CASE 001 · ${labels[scene]}`;}
-  start(){this.board=new Board();this.line=0;this.selected=0;this.hintUsed=false;this.hintText='';this.pause=false;this.sound.play('confirm');this.change('ROOM_INTRO');}
-  retry(){this.board=new Board();this.resolveTime=0;this.hintUsed=false;this.hintText='';this.pause=false;this.change('PUZZLE');}
+  change(scene:Scene) {this.scene=scene;if(scene==='MEMORY')this.sound.play('memory');if(scene==='RETURN')this.sound.play('win');this.sceneTime=0;this.typed=0;this.input.clear();document.querySelector('#scene-label')!.textContent=`BRAIN DIVE / ${labels[scene]}`;document.querySelector('#state-label')!.textContent=scene==='TITLE'?'SESSION READY':scene==='COMPLETE'?'SESSION COMPLETE':`CASE 001 · ${labels[scene]}`;}
+  start(){this.board=new ExcavationBoard();this.assignments={};this.bossCard=0;this.selfCard=0;this.effects.remaining=0;this.line=0;this.selected=0;this.pause=false;this.sound.play('confirm');this.change('ROOM_INTRO');}
+  retry(){this.board=new ExcavationBoard();this.assignments={};this.bossCard=0;this.selfCard=0;this.effects.remaining=0;this.pause=false;this.change('PUZZLE');}
+  selectTile(p:Point){if(this.scene==='PUZZLE'&&!this.pause)this.board.selected={...p};}
+  dig(p=this.board.selected){if(this.scene!=='PUZZLE'||this.pause||this.effects.remaining>0)return;this.accept(this.board.dig(p));}
+  observe(p=this.board.selected){if(this.scene!=='PUZZLE'||this.pause||this.effects.remaining>0)return;this.board.selected={...p};this.accept(this.board.observe(p));}
+  private accept(result:ActionResult){if(!result.ok){this.sound.play('step');return;}
+    this.effects.start(result.at??this.board.selected,result.kind??'unlock');this.sound.play(result.kind==='dig'?'dig':result.kind==='observe'?'observe':'release');
+    if(result.memory){this.memory=result.memory;this.memoryReturn='PUZZLE';this.change('MEMORY');}
+    else if(result.kind==='win'){this.sound.play('breath');this.change('RETURN');}
+  }
+  openCards(){if(this.scene==='PUZZLE'&&!this.pause){this.change('CARDS');this.selected=0;}}
+  closeCards(){if(this.scene==='CARDS')this.change('PUZZLE');}
+  viewMemory(id:number){if(this.scene!=='CARDS'||!this.board.memories.has(id))return;this.memory=id;this.memoryReturn='CARDS';this.change('MEMORY');}
+  classify(){if(this.scene!=='CARDS'||this.pause)return;const r=this.board.classify(this.assignments);if(r.ok){this.sound.play('boss');this.effects.start({x:4,y:8},'unlock');}else this.sound.play('step');}
+  connect(){if(this.scene!=='CARDS'||this.pause)return;const r=this.board.connect(this.bossCard,this.selfCard);if(r.ok)this.sound.play('win');else this.sound.play('step');}
+  openInterview(){if(this.scene!=='PUZZLE'||this.pause||this.effects.remaining>0)return;this.interviewAnswer='';this.selected=0;this.change('INTERVIEW');}
+  answerInterview(index:number){if(this.scene!=='INTERVIEW'||this.pause||this.interviewAnswer)return;const result=this.board.interview(index);if(!result.ok)return;this.interviewAnswer=result.message;this.interviewPoint=index===0?{x:8,y:4}:index===1?{x:4,y:4}:index===2?{x:4,y:7}:{...this.board.selected};this.typed=0;this.sound.play('confirm');}
+  resumeExploration(){if(this.scene!=='INTERVIEW'||this.pause)return;this.change('DIVE');this.sceneTime=2.9;this.effects.start(this.interviewPoint,'unlock');}
   currentLine(){if(this.scene==='DIALOGUE')return intro[this.line];if(this.scene==='ANSWER')return {speaker:'田辺 悠介',text:this.line===0?replies[this.question]:lastLine};if(this.scene==='OUTRO')return outro[this.line];return {speaker:'',text:''};}
   advance(){const current=this.currentLine();if(this.typed<current.text.length){this.typed=current.text.length;return;}this.sound.play('confirm');if(this.scene==='DIALOGUE'){if(++this.line>=intro.length){this.selected=0;this.change('QUESTION');}else this.typed=0;}else if(this.scene==='ANSWER'){if(++this.line>1){this.sound.play('dive');this.change('DIVE');}else this.typed=0;}else if(this.scene==='OUTRO'){if(++this.line>=outro.length){this.stampPlayed=false;this.change('REPORT');}else this.typed=0;}}
   private key(key:string) {
     if(key==='KeyM'){this.toggleSound();return;}
-    if(key==='Escape'){if(this.scene==='SETTINGS'){this.change('TITLE');return;}if(!['TITLE','COMPLETE'].includes(this.scene)){this.pause=!this.pause;this.input.clear();}return;}
+    if(key==='Escape'){if(this.scene==='CARDS'&&!this.pause){this.closeCards();return;}if(this.scene==='SETTINGS'){this.change('TITLE');return;}if(!['TITLE','COMPLETE'].includes(this.scene)){this.pause=!this.pause;this.input.clear();}return;}
     if(this.pause){if(key==='KeyR'){this.retry();}else if(key==='Enter')this.pause=false;return;}
     if(this.scene==='TITLE') {if(['ArrowUp','ArrowDown'].includes(key)){this.titleSelected=1-this.titleSelected;this.sound.play('step');}if(confirm(key)){if(this.titleSelected===0)this.start();else this.change('SETTINGS');}return;}
     if(this.scene==='SETTINGS'){
@@ -45,80 +65,36 @@ export class Game {
     if(this.scene==='ROOM_INTRO'){if(confirm(key)){this.line=0;this.change('DIALOGUE');}return;}
     if(['DIALOGUE','ANSWER','OUTRO'].includes(this.scene)){if(confirm(key))this.advance();return;}
     if(this.scene==='QUESTION'){if(key==='ArrowUp')this.selected=(this.selected+2)%3;if(key==='ArrowDown')this.selected=(this.selected+1)%3;if(confirm(key)){this.question=this.selected;this.line=0;this.change('ANSWER');}return;}
+    if(this.scene==='CARDS'){if(key==='KeyC'||confirm(key))this.closeCards();return;}
+    if(this.scene==='INTERVIEW'){if(this.interviewAnswer){if(confirm(key)){if(this.typed<this.interviewAnswer.length)this.typed=this.interviewAnswer.length;else this.resumeExploration();}}else{if(key==='ArrowUp')this.selected=(this.selected+3)%4;if(key==='ArrowDown')this.selected=(this.selected+1)%4;if(confirm(key))this.answerInterview(this.selected);}return;}
     if(this.scene==='DIVE'){if(confirm(key))this.change('PUZZLE');return;}
-    if(this.scene==='MEMORY'){if(confirm(key)&&this.sceneTime>.25){if(this.board.pendingMemories.length){this.memory=this.board.pendingMemories.shift()!;this.change('MEMORY');}else {this.board.spawn();this.resolveTime=0;this.change('PUZZLE');}}return;}
+    if(this.scene==='MEMORY'){if(confirm(key)&&this.sceneTime>.25){if(this.typed<memoryCards[this.memory-1].text.length)this.typed=memoryCards[this.memory-1].text.length;else this.change(this.memoryReturn);}return;}
     if(this.scene==='PUZZLE'){
-      if(key==='KeyR'){this.retry();return;}
-      if(this.board.failed){if(confirm(key))this.retry();return;}
-      if(key==='KeyH'&&!this.hintUsed){this.hintText=this.board.hint();this.hintUsed=true;this.hintTime=8;return;}
-      if(!this.board.active||this.resolveTime>0)return;
-      if(key==='ArrowLeft')this.board.move(-1);if(key==='ArrowRight')this.board.move(1);
-      if(key==='ArrowUp'||key==='KeyX'){this.board.rotate(1);this.sound.play('rotate');}
-      if(key==='KeyZ'){this.board.rotate(-1);this.sound.play('rotate');}
-      if(key==='Space'){this.board.drop();this.afterLock();}return;
+      if(key==='KeyR'){this.retry();return;}if(key==='KeyO'){this.observe();return;}if(key==='KeyC'){this.openCards();return;}if(key==='KeyQ'){this.openInterview();return;}
+      if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(key)){const p=this.board.selected;this.selectTile({x:Math.max(0,Math.min(9,p.x+(key==='ArrowLeft'?-1:key==='ArrowRight'?1:0))),y:Math.max(0,Math.min(11,p.y+(key==='ArrowUp'?-1:key==='ArrowDown'?1:0)))});}
+      if(confirm(key))this.dig();return;
     }
     if(this.scene==='REPORT'&&confirm(key)){if(this.sceneTime<9)this.sceneTime=9;else this.change('COMPLETE');return;}
     if(this.scene==='COMPLETE'&&confirm(key))this.change('TITLE');
-  }
-  private afterLock(){
-    this.resolveTime=this.board.lastWaves.length?.65:.15;this.dropTime=0;
-    this.impact=.25;
-    if(this.board.lastReleased){this.releaseGlow=1.2;this.sound.play('release');}
-    else this.sound.play(this.board.lastDamaged?'crack':this.board.lastWaves.length?'clear':'land');
-    if(this.board.lastChain>1){this.sound.play('chain');this.impact=.35;this.releaseGlow=Math.max(this.releaseGlow,.9);}
-    if(this.board.bossAttack){this.bossFlash=1.3;this.sound.play('boss');}
   }
   private update(dt:number){
     this.time+=dt;
     if(!this.art.ready&&!['TITLE','SETTINGS'].includes(this.scene)){this.input.clear();this.sound.update('TITLE',this.pause);return;}
     // Consume at most one action at a scene boundary; no input leaks into the next scene.
     for(const key of this.input.take()){const before=this.scene;this.sound.unlock();this.key(key);if(this.scene!==before)break;}
-    this.sound.update(this.scene,this.pause,this.board.boss,this.board.height());
+    this.sound.update(['CARDS'].includes(this.scene)?'MEMORY':this.scene==='INTERVIEW'?'DIALOGUE':this.scene,this.pause,this.board.boss&&!this.board.completed.has('source'),this.board.depth);
     if(this.pause)return;
-    this.impact=Math.max(0,this.impact-dt);this.releaseGlow=Math.max(0,this.releaseGlow-dt);this.bossFlash=Math.max(0,this.bossFlash-dt);
+    this.effects.update(dt);
     this.sceneTime+=dt;this.typed+=dt*25;
-    if(['DIALOGUE','ANSWER','OUTRO'].includes(this.scene)&&Math.floor(this.typed/3)!==this.lastGlyph&&this.typed<this.currentLine().text.length){this.lastGlyph=Math.floor(this.typed/3);this.sound.play('type');}this.hintTime=Math.max(0,this.hintTime-dt);
+    if(['DIALOGUE','ANSWER','OUTRO'].includes(this.scene)&&Math.floor(this.typed/3)!==this.lastGlyph&&this.typed<this.currentLine().text.length){this.lastGlyph=Math.floor(this.typed/3);this.sound.play('type');}
     if(this.scene==='ROOM_INTRO'&&this.sceneTime>3){this.line=0;this.change('DIALOGUE');}
     if(this.scene==='DIVE'&&this.sceneTime>3.8)this.change('PUZZLE');
     if(this.scene==='RETURN'&&this.sceneTime>2.5){this.line=0;this.change('OUTRO');}
     if(this.scene==='REPORT'&&this.sceneTime>8&&!this.stampPlayed){this.sound.play('stamp');this.stampPlayed=true;}
-    if(this.scene!=='PUZZLE'||this.board.failed)return;
-    if(this.resolveTime>0){this.resolveTime-=dt;if(this.resolveTime<=0){if(this.board.won){this.sound.play('clear');this.change('RETURN');}else if(this.board.pendingMemories.length){this.memory=this.board.pendingMemories.shift()!;this.change('MEMORY');}else this.board.spawn();}return;}
-    for(const code of this.input.repeat(dt)){if(code==='ArrowLeft')this.board.move(-1);if(code==='ArrowRight')this.board.move(1);}
-    if(!this.board.active)return;
-    if(!this.timed&&!this.input.held.has('ArrowDown')){this.dropTime=0;return;}
-    this.dropTime+=dt;
-    const interval=this.input.held.has('ArrowDown')?SOFT_SECONDS:FALL_SECONDS;
-    if(this.dropTime>=interval){this.dropTime=0;this.board.step();if(!this.board.active)this.afterLock();}
   }
   private frame=(now:number)=>{const dt=this.previous?Math.min((now-this.previous)/1000,.1):0;this.previous=now;this.accumulator+=dt;while(this.accumulator>=1/60){this.update(1/60);this.accumulator-=1/60;}this.draw();requestAnimationFrame(this.frame);};
   private dialogue() {const a=this.art,l=this.currentLine();a.box(7,123,306,51,'#c5bfcb','#0a0b13');a.text(l.speaker,16,129,'#c3a68c',6);a.wrapped(l.text.slice(0,Math.floor(this.typed)),17,141,279,'#e9e3da',7,11);if(this.typed>=l.text.length&&Math.floor(this.time*2)%2)a.text('▼',301,162,'#bda4be',6);}
-  private puzzle(){const a=this.art,b=this.board;a.brain(this.time,this.reduced,b.boss);
-    a.rect(4,7,66,156,'#090c16df');a.rect(244,7,70,153,'#090c16df');
-    if(!this.reduced&&this.impact>0){a.c.translate(Math.round(Math.sin(this.time*85)*this.impact*5),Math.round(this.impact*4));}
-    a.text(this.timed?'STAGE 01 / LIVE':'STAGE 01 / THINK',10,12,'#a4a2bc',6);a.text('月曜の朝',10,23,'#eee3df',8);a.rect(10,39,56,1,'#514363');
-    a.text('DIAGNOSIS',10,47,'#857991',5);for(let i=0;i<3;i++){a.box(10+i*18,57,13,11,i<b.memories?'#e7bb92':'#4c405e',i<b.memories?'#57405d':'#171423');a.text(`${i+1}`,16+i*18,59,i<b.memories?'#f5d6af':'#655b75',6,'center');}
-    a.text(`${b.diagnosed} / 6 解放`,10,75,'#b5a3bc',5);a.block('SEALED_MEMORY',10,84);a.text('封印→ひび→解放',22,86,'#beab9a',4);a.text('NEXT',10,96,'#a9a0b8',5);
-    b.queue.slice(0,2).forEach((pair,i)=>{a.box(10+i*27,101,22,27,'#43364f','#12101f');a.block(pair[1],17+i*27,104);a.block(pair[0],17+i*27,114);});
-    a.text('PRESSURE',10,138,'#9f91ab',5);a.rect(10,148,53,3,'#2b263b');a.rect(10,148,Math.round(b.height()/12*53),3,b.height()>8?'#e57691':'#9c79b2');a.text(`TURN ${String(b.turns).padStart(2,'0')}`,10,157,'#71667f',5);
-    if(b.boss){a.text('上司の残響',272,66,'#e5a6b9',6,'center');a.text(['「結果を出せ」','「まだなの？」','「代わりはいる」'][Math.floor(b.turns/6)%3],272,77,'#c87a9b',5,'center');a.text(this.question===2?'あの声は、ここにいる。':`次の叱責まで ${6-b.turns%6} 手`,272,87,'#8a607f',4,'center');}
-    else {a.text('EMOTIONS',247,17,'#ac93b2',5);a.text('声と記憶を',247,32,'#7d6d8a',6);a.text('ほどいていく。',247,42,'#7d6d8a',6);}
-    const kinds:Emotion[]=['ANXIETY','GUILT','FATIGUE','ANGER'];kinds.forEach((kind,i)=>{a.block(kind,249,101+i*13);a.text(kind==='ANGER'&&!b.angerUnlocked?'未解放':NAMES[kind],263,103+i*13,kind==='ANGER'&&!b.angerUnlocked?'#64566f':'#bbaac5',6);});
-    const ghost=b.ghost();if(ghost)pieceCells(ghost).forEach((p,i)=>a.block(ghost.pair[i],121+p.x*10,25+p.y*10,true));
-    b.cells.forEach((r,y)=>r.forEach((kind,x)=>{if(kind)a.block(kind,121+x*10,25+y*10);}));
-    if(b.active){const piece=b.active;pieceCells(piece).forEach((p,i)=>a.block(piece.pair[i],121+p.x*10,25+p.y*10));}
-    const preview=b.preview();
-    if(preview.affected.length){
-      for(const p of preview.affected){a.c.strokeStyle='#f7c3df';a.c.lineWidth=1;a.c.strokeRect(120.5+p.x*10,24.5+p.y*10,10,10);}
-      a.text(preview.released?`解放予測 +${preview.released}`:`封印に届く / ${preview.affected.length}`,10,131,'#e7b0d0',4);
-    }
-
-    if(this.resolveTime>0&&b.lastWaves.length){for(const wave of b.lastWaves)for(const p of wave){a.c.globalAlpha=Math.max(0,this.resolveTime/.4)*.6;a.rect(121+p.x*10,25+p.y*10,9,9,'#e6c4e2');a.c.globalAlpha=1;}}
-    if(this.releaseGlow>0)a.releaseParticles(this.time,this.releaseGlow,b.lastWaves,b.lastReleased?'記憶の封印がほどける':`${b.lastChain} CHAIN / 感情がつながる`);
-    if(this.bossFlash>0){a.c.globalAlpha=Math.min(.7,this.bossFlash);a.text('その記憶に、触れるな。',160,13,'#ee90b7',7,'center');a.c.globalAlpha=1;}
-    a.rect(74,164,240,13,'#0b0914');let message=b.angerUnlocked?'怒りを、右下の黒い核の隣に。':b.clears===0?'中央の6つの記憶を、周囲からほどく。':b.memories===0?'封印を2回ほどき、塊を取り除こう。':b.memories===1?'誰の声が、あなたを責めている？':'すべてを、一人で引き受けていた。';if(this.hintTime>0)message=this.hintText;a.text(message,79,168,'#c9b0c9',6);
-    if(b.failed){a.c.globalAlpha=.85;a.rect(0,0,320,180,'#090912');a.c.globalAlpha=1;a.box(60,58,200,63,'#a480a6');a.text('脳内が飽和した',160,72,'#e2c4d3',10,'center');a.text('急がなくて大丈夫。もう一度、整理しよう。',160,92,'#a79bb4',6,'center');a.text('ENTER / R  再挑戦',160,106,'#dbc49e',6,'center');}
-  }
+  private puzzle(){this.renderer.draw(this.art,this.board,this.time,this.reduced,this.effects);}
   private draw(){const a=this.art,c=a.c;c.globalAlpha=1;const scale=(this.canvas.width||320)/320;c.setTransform(scale,0,0,scale,0,0);a.rect(0,0,320,180,'#090912');
     if(!this.art.ready&&!['TITLE','SETTINGS'].includes(this.scene)){a.text('記憶の輪郭を、読み込んでいます。',160,82,'#d6bdcf',9,'center');return;}
     if(this.scene==='TITLE'){a.title(this.time,this.reduced);a.text(this.titleSelected===0?'◆':' ',23,139,'#e4ad9a',7);a.text('はじめる',37,139,this.titleSelected===0?'#f1dfc7':'#84798e',8);a.text(this.titleSelected===1?'◆':' ',105,140,'#e4ad9a',7);a.text('設定',119,140,this.titleSelected===1?'#f1dfc7':'#84798e',7);a.text('↑ ↓ 選択    ENTER 決定',21,157,'#71677f',4);}
@@ -138,9 +114,21 @@ export class Game {
       else{this.puzzle();black(1-(t-3.05)/.75);}
       if(t>=1.3&&t<2)a.text('……あの人の声が。',160,163,'#c2b2c5',6,'center');
     }
-    else if(this.scene==='PUZZLE'||this.scene==='MEMORY'||this.scene==='RETURN') {this.puzzle();if(this.scene==='MEMORY'){c.globalAlpha=.78;a.rect(0,0,320,180,'#080912');c.globalAlpha=1;a.memory(this.memory);const m=memories[this.memory-1];a.text(m.time,86,20,'#d3a0c5',5);a.text(m.title,160,96,'#edcdb4',9,'center');a.text(m.text,160,112,'#e7dae0',7,'center');a.wrapped(m.detail,85,125,151,'#9f8fae',6,9);if(this.question===0)a.text('手がかり：朝の通知と、終わらない仕事。',160,143,'#bd9fbc',4,'center');if(this.question===1&&this.memory===1)a.text('会議室での声も、ここにつながっている。',160,143,'#bd9fbc',4,'center');a.text(this.memory===3?'怒りが解放された / ENTER 続ける':'ENTER 記憶を受けとめる',160,153,'#dac5a6',5,'center');}if(this.scene==='RETURN'){c.globalAlpha=Math.min(1,this.sceneTime/2);a.rect(0,0,320,180,'#171926');c.globalAlpha=1;a.text('声が、遠くなっていく。',160,83,'#d4bdc6',8,'center');}}
+    else if(this.scene==='INTERVIEW'){
+      a.room(this.time);a.box(7,106,306,68,'#bcb5c8','#090b14');a.text('追加の問診 / 探索状態は保持されています',16,112,'#b69ebd',6);
+      if(this.interviewAnswer)a.wrapped(this.interviewAnswer.slice(0,Math.floor(this.typed)),16,125,286,'#eee0d6',7,11);
+      else interviewQuestions.forEach((q,i)=>a.text(`${i===this.selected?'◆':' '} ${q.title}`,17,124+i*11,i===this.selected?'#ead9c1':'#a298b0',6));
+    }
+    else if(['PUZZLE','MEMORY','CARDS','RETURN'].includes(this.scene)){
+      this.puzzle();
+      if(this.scene==='MEMORY'){c.globalAlpha=.8;a.rect(0,0,320,180,'#080912');c.globalAlpha=Math.min(1,.5+this.sceneTime*2);a.memory(this.memory);c.globalAlpha=1;const m=memoryCards[this.memory-1];a.text(m.time,80,20,'#d3a0c5',5);a.text(m.title,160,96,'#edcdb4',9,'center');a.wrapped(m.text.slice(0,Math.floor(this.typed)),80,111,163,'#e7dae0',7,10);a.wrapped(m.detail,80,134,163,'#b8a8c5',5,8);a.text('ENTER 受けとめる / 記憶から再閲覧できます',160,154,'#dac5a6',4,'center');}
+      if(this.scene==='CARDS'){c.globalAlpha=.9;a.rect(0,0,320,180,'#080a13');c.globalAlpha=1;a.text('記憶を結びつける',160,21,'#e4cbb5',12,'center');a.text(`発見 ${this.board.memories.size} / 3 ・ 閲覧と整理は集中力を消費しません`,160,45,'#ac9bb9',6,'center');
+        memoryCards.forEach((m,i)=>{a.box(29+i*91,62,82,47,'#5d4d6d','#181624');a.text(this.board.memories.has(m.id)?m.title:'まだ見えない記憶',34+i*91,72,'#cdb7cd',7);a.text(this.assignments[m.id]?({event:'出来事',others:'他者の言葉',interpretation:'本人の解釈'}[this.assignments[m.id]!]):'未分類',34+i*91,92,'#b098ba',5);});
+        a.wrapped(this.board.message,27,121,267,'#ddc5db',7,11);a.text('画面下のカードで分類・関連づけ / ESC 地図へ',160,166,'#9a8ca6',5,'center');}
+      if(this.scene==='RETURN'){c.globalAlpha=Math.min(1,this.sceneTime/2);a.rect(0,0,320,180,'#13141e');c.globalAlpha=1;a.text('声の出どころが、見えてきた。',160,83,'#d4bdc6',8,'center');}
+    }
     else if(this.scene==='REPORT'){a.room(this.time);c.globalAlpha=.65;a.rect(0,0,320,180,'#0a0b15');c.globalAlpha=1;a.polygon([[62,9],[244,9],[259,24],[259,170],[62,170]],'#ddd1bb');a.polygon([[244,9],[244,24],[259,24]],'#afa38f');a.text('診 断 書',160,20,'#3a3541',11,'center');a.rect(77,38,165,1,'#ab9c8c');const lines=[['氏名　田辺 悠介（28）',48],['所見',66],['強い心理的負担に伴う心身の不調が',79],['認められる。職場での継続的な負荷が',90],['背景にある可能性があり、休養と',101],['継続的な評価が望ましい。',112],['院内医師確認済・署名　朝倉 灯',135]] as const;lines.forEach(([s,y],i)=>{const count=Math.max(0,Math.floor((this.sceneTime-i*.8-.5)*24));a.text(s.slice(0,count),78,y,'#403b47',7);});if(this.sceneTime>=8){a.box(222,132,24,24,'#ac4559','#ddd1bb');a.text('確認',234,136,'#ac4559',8,'center');a.text('済',234,145,'#ac4559',8,'center');a.text('架空のゲーム内文書',79,157,'#8a7b7c',4);}a.text(this.sceneTime>=9?'ENTER 書類を渡す':'ENTER 印字を完了',160,174,'#b9a8bb',5,'center');}
     else if(this.scene==='COMPLETE'){a.rect(0,0,320,180,'#10111b');a.rect(154,37,12,1,'#aa9475');a.text('SESSION COMPLETE',160,62,'#e7d3b7',13,'center');a.text('今日、ひとつの声に名前がついた。',160,91,'#b5a3bc',8,'center');a.text('整理することは、ここからも続いていく。',160,108,'#746c86',6,'center');a.text('ENTER タイトルへ',160,147,'#c3ac8b',6,'center');}
-    if(this.pause){c.globalAlpha=.86;a.rect(0,0,320,180,'#090b15');c.globalAlpha=1;a.box(72,47,176,87,'#76647f','#11121e');a.text('PAUSED',160,61,'#ddcbb5',12,'center');a.text('急がなくて、大丈夫。',160,82,'#aa97b5',7,'center');a.text('ENTER / ESC 再開',160,102,'#d7bd9f',6,'center');a.text('R パズルを再挑戦    M 音',160,118,'#7e748c',5,'center');}
+    if(this.pause){c.globalAlpha=.86;a.rect(0,0,320,180,'#090b15');c.globalAlpha=1;a.box(72,47,176,87,'#76647f','#11121e');a.text('PAUSED',160,61,'#ddcbb5',12,'center');a.text('急がなくて、大丈夫。',160,82,'#aa97b5',7,'center');a.text('ENTER / ESC 再開',160,102,'#d7bd9f',6,'center');a.text('R 探索を最初から    M 音',160,118,'#7e748c',5,'center');}
   }
 }

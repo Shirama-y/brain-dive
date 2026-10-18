@@ -1,5 +1,5 @@
 export type MusicMood = 'waiting'|'room'|'dive'|'brain'|'memory'|'return'|'report';
-export type SoundCue = 'step'|'confirm'|'clear'|'dive'|'stamp'|'rotate'|'land'|'crack'|'release'|'memory'|'boss'|'win'|'type'|'chain';
+export type SoundCue = 'step'|'confirm'|'clear'|'dive'|'stamp'|'crack'|'release'|'memory'|'boss'|'win'|'type'|'dig'|'observe'|'breath';
 export const midiToHz = (midi:number) => 440*Math.pow(2,(midi-69)/12);
 const ROOTS=[45,41,48,43];
 const MOTIF=[12,19,24,22,19,15,14,19,12,19,27,24,22,19,15,14];
@@ -43,7 +43,7 @@ export class Sound {
     if(!this.context||!this.master||!this.music)return;
     const c=this.context;const volume=this.muted?0:this.volume;
     if(volume!==this.lastVolume){this.master.gain.setTargetAtTime(volume,c.currentTime,.12);this.lastVolume=volume;}
-    const level=paused?0:.75;if(level!==this.lastLevel){this.music.gain.setTargetAtTime(level,c.currentTime,.2);this.lastLevel=level;}
+    const level=paused?0:scene==='RETURN'?.04:.75;if(level!==this.lastLevel){this.music.gain.setTargetAtTime(level,c.currentTime,.2);this.lastLevel=level;}
     if(paused||this.muted||c.state!=='running'){this.next=c.currentTime+.08;return;}
     const mood:MusicMood=scene==='TITLE'||scene==='SETTINGS'?'waiting':['ROOM_INTRO','DIALOGUE','QUESTION','ANSWER','OUTRO'].includes(scene)?'room':scene==='DIVE'?'dive':scene==='PUZZLE'?'brain':scene==='MEMORY'?'memory':scene==='RETURN'?'return':'report';
     if(mood!==this.mood){this.mood=mood;this.step=0;this.next=c.currentTime+.08;}
@@ -63,12 +63,13 @@ export class Sound {
   play(kind:SoundCue){
     if(this.muted||!this.context||!this.effects)return;
     const c=this.context,now=c.currentTime;
-    if(['memory','release','win','chain'].includes(kind)){
-      const notes=kind==='chain'?[69,72,76,81]:kind==='memory'?[69,76,79,83]:kind==='win'?[57,64,69,72,76]:[64,69,76];
+    if(kind==='breath'){const buffer=c.createBuffer(1,c.sampleRate*2.4,c.sampleRate),data=buffer.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.sin(Math.PI*i/data.length)*.07;const source=c.createBufferSource(),filter=c.createBiquadFilter();filter.type='lowpass';filter.frequency.value=550;source.buffer=buffer;source.connect(filter);filter.connect(this.effects);source.start();source.onended=()=>{source.disconnect();filter.disconnect();};return;}
+    if(['memory','release','win'].includes(kind)){
+      const notes=kind==='memory'?[69,76,79,83]:kind==='win'?[57,64,69,72,76]:[64,69,76];
       notes.forEach((note,i)=>this.note(note,now+i*.095,1.5,.05,'sine',true));return;
     }
     if(kind==='boss'){[33,34,45].forEach((note,i)=>this.note(note,now+i*.05,.8,.04,'triangle',true));return;}
-    const params:Record<string,number[]>={step:[100,70,.035,.035],confirm:[330,520,.1,.07],clear:[660,220,.35,.09],dive:[150,35,.9,.075],stamp:[90,40,.15,.1],rotate:[260,340,.045,.04],land:[150,75,.065,.055],crack:[430,180,.2,.065],type:[720,600,.02,.01]};
+    const params:Record<string,number[]>={dig:[115,38,.2,.09],observe:[420,630,.18,.035],step:[100,70,.035,.035],confirm:[330,520,.1,.07],clear:[660,220,.35,.09],dive:[150,35,.9,.075],stamp:[90,40,.15,.1],crack:[430,180,.2,.065],type:[720,600,.02,.01]};
     const p=params[kind]??params.clear,o=c.createOscillator(),g=c.createGain();
     o.type=kind==='clear'?'sine':'triangle';o.frequency.setValueAtTime(p[0],now);o.frequency.exponentialRampToValueAtTime(p[1],now+p[2]);g.gain.setValueAtTime(p[3],now);g.gain.exponentialRampToValueAtTime(.0001,now+p[2]);o.connect(g);g.connect(this.effects);o.start(now);o.stop(now+p[2]);o.onended=()=>{o.disconnect();g.disconnect();};
   }

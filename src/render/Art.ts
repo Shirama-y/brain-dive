@@ -1,7 +1,6 @@
 import { NovelAssets } from './NovelAssets';
-import { type Cell, type Emotion } from '../puzzle/level01';
-export const COLORS: Record<NonNullable<Cell>,string> = { ANXIETY:'#a378e0',GUILT:'#e36d91',FATIGUE:'#54accc',ANGER:'#f2b657',REPROACH:'#464051',SEALED_MEMORY:'#b2a69b',CRACKED_MEMORY:'#e0cba3',CORE:'#151324' };
-export const NAMES: Record<Emotion,string> = {ANXIETY:'不安',GUILT:'自責',FATIGUE:'疲労',ANGER:'怒り'};
+type Emotion = 'ANXIETY'|'GUILT'|'FATIGUE';
+const COLORS:Record<Emotion,string>={ANXIETY:'#a378e0',GUILT:'#e36d91',FATIGUE:'#54accc'};
 export class Art {
   private novel=new NovelAssets();
   get ready(){return this.novel.ready;}
@@ -106,7 +105,7 @@ export class Art {
   headPath() {const c=this.c;c.beginPath();c.moveTo(126,13);c.lineTo(159,6);c.lineTo(198,12);c.lineTo(225,27);c.lineTo(236,51);c.lineTo(235,86);c.lineTo(225,108);c.lineTo(221,135);c.lineTo(237,153);c.lineTo(231,169);c.lineTo(145,171);c.lineTo(141,157);c.lineTo(121,155);c.lineTo(112,148);c.lineTo(110,137);c.lineTo(104,132);c.lineTo(110,126);c.lineTo(100,121);c.lineTo(95,112);c.lineTo(83,109);c.lineTo(81,104);c.lineTo(95,88);c.lineTo(97,68);c.lineTo(102,41);c.lineTo(113,24);c.closePath();}
   brain(t:number,reduced:boolean,boss=false) {
     if(this.novel.draw(this.c,'brain',0,0,320,180)){
-      this.intrusion(t,reduced,.17);this.brainGrid();if(boss)this.boss(264,28,t);return;
+      this.intrusion(t,reduced,.17);if(boss)this.boss(264,28,t);return;
     }
     this.rect(0,0,320,180,'#0a0812');const c=this.c;
     for(let i=0;i<80;i++){const x=(i*83+7)%320,y=(i*37+11)%180;this.rect(x,y,1,1,i%3?'#332041':'#63506c');}
@@ -121,14 +120,8 @@ export class Art {
     // Tiny office fragments embedded in the brain.
     this.rect(207,81,17,16,'#1a2234');this.rect(209,83,13,9,'#486d83');this.rect(212,96,8,2,'#5d557a');this.rect(203,100,25,3,'#9d718b');for(let i=0;i<4;i++)this.rect(103+i*3,137-i*2,2,12,'#66518a');
     c.restore();this.line([[97,71],[106,75],[114,74]],'#e395b4',2);this.eye(104,78,5,t,'#dbc2c7');this.line([[97,83],[96,91],[84,105],[97,108]],'#dca5b3');this.line([[101,120],[110,122],[106,127]],'#b278a4');
-    this.rect(119,23,84,124,'#51405f');this.rect(120,24,82,122,'#080d1b');
-    for(let y=0;y<12;y++)for(let x=0;x<8;x++){this.rect(121+x*10,25+y*10,9,9,'#101729');this.rect(121+x*10,25+y*10,1,1,'#29263b');}
     for(const [x,y] of [[225,91],[106,146]]){this.rect(x,y,8,15,'#702b75');this.rect(x+1,y+1,6,13,'#cf5187');this.rect(x+5,y+8,1,1,'#f8c8b3');}
     if(boss)this.boss(264,28,t);
-  }
-  private brainGrid(){
-    this.rect(119,23,84,124,'#796779');this.rect(120,24,82,122,'#080d1bf0');
-    for(let y=0;y<12;y++)for(let x=0;x<8;x++){this.rect(121+x*10,25+y*10,9,9,'#101729d9');this.rect(121+x*10,25+y*10,1,1,'#59405755');}
   }
   boss(x:number,y:number,t:number) {
     if(this.novel.get('scenes')){
@@ -141,17 +134,14 @@ export class Art {
     this.polygon([[-4,19],[7,17],[10,23],[5,28],[-3,26]],'#261425');this.rect(-1,19,6,2,'#e5c9b6');this.rect(1,24,5,2,'#e08a9b');
     for(let i=0;i<4;i++)this.line([[-17,6+i*5],[-22-Math.sin(t+i)*3,9+i*4]],'#79345b');c.restore();
   }
-  block(kind:NonNullable<Cell>,x:number,y:number,ghost=false) {
-    const color=COLORS[kind];if(ghost){this.c.globalAlpha=.3;this.box(x,y,9,9,color,'#16172b');this.c.globalAlpha=1;return;}
+  block(kind:Emotion,x:number,y:number) {
+    const color=COLORS[kind];
     this.rect(x,y,9,9,'#0b0b16');this.rect(x+1,y,7,9,color);this.rect(x,y+1,9,7,color);this.rect(x+1,y+1,7,1,'#ffffff44');this.rect(x+1,y+7,7,1,'#00000035');
-    if(kind==='CORE'){this.eye(x+4,y+4,4,0,'#cc84ae');return;}
-    if(kind==='SEALED_MEMORY'||kind==='CRACKED_MEMORY'){this.rect(x+2,y+1,5,7,'#554754');this.rect(x+3,y+2,3,1,'#ede0c6');this.rect(x+3,y+4,3,1,'#ede0c6');if(kind==='SEALED_MEMORY'){this.rect(x+1,y+4,7,2,'#7c6878');this.rect(x+4,y+4,2,2,'#ead4b4');}else{this.line([[x+5,y+1],[x+3,y+4],[x+5,y+5],[x+3,y+8]],'#f3b164');}return;}
-    if(kind==='REPROACH'){this.rect(x+2,y+2,5,1,'#d6c9d6');this.rect(x+4,y+2,1,5,'#d6c9d6');this.rect(x+2,y+4,5,1,'#d6c9d6');return;}
     const ink='#242033';this.rect(x+2,y+3,1,2,ink);this.rect(x+6,y+3,1,2,ink);
     if(kind==='ANXIETY'){this.rect(x+3,y+6,3,1,ink);this.rect(x+4,y+5,1,1,ink);this.rect(x+7,y+1,1,1,'#eee5ff');}
     if(kind==='GUILT'){this.rect(x+1,y+2,2,1,ink);this.rect(x+6,y+2,2,1,ink);this.rect(x+4,y+6,1,1,ink);}
     if(kind==='FATIGUE'){this.rect(x+2,y+3,2,1,ink);this.rect(x+5,y+3,2,1,ink);this.rect(x+3,y+6,3,1,ink);}
-    if(kind==='ANGER'){this.rect(x+1,y+1,2,1,ink);this.rect(x+3,y+2,1,1,ink);this.rect(x+6,y+1,2,1,ink);this.rect(x+5,y+2,1,1,ink);this.rect(x+3,y+6,3,1,ink);}
+
   }
   title(t:number,reduced:boolean) {
     // A waiting-room title rather than an enlarged copy of the puzzle board.
@@ -176,19 +166,11 @@ export class Art {
     for(const [x,y,size]of [[28,31,13],[278,134,12],[291,18,9],[42,144,8]])this.eye(x,y,size,reduced?0:t,'#b67cbd');
     c.restore();
   }
-  releaseParticles(t:number,life:number,waves:{x:number;y:number}[][],label='記憶の封印がほどける'){
-    const c=this.c;c.save();const progress=1-life/1.2;c.globalAlpha=Math.max(0,life/1.2);
-    for(const p of waves.flat())for(let i=0;i<4;i++){
-      const a=i*Math.PI/2+p.x,x=126+p.x*10+Math.cos(a)*progress*21,y=30+p.y*10-progress*20+Math.sin(a)*progress*9;
-      this.rect(x,y,i%2?1:2,1,i%2?'#9ce8df':'#e9b5d3');
-    }
-    this.text(label,160,151-Math.round(progress*4),'#f0c7d8',6,'center');c.restore();
-  }
   memory(index:number) {
-    if(this.novel.get('scenes')){this.box(66,12,188,151,'#b9a0b3','#11101f');this.novel.draw(this.c,'scenes',73,31,174,58,index);return;}
+    if(this.novel.get('scenes')){this.box(66,12,188,151,'#b9a0b3','#11101f');this.novel.draw(this.c,'scenes',73,31,174,58,[1,3,2][index-1]);return;}
     const x=87,y=31;this.box(70,12,181,151,'#c99abf','#161324');this.rect(x,y,147,58,'#24263c');
     if(index===1){this.rect(x+7,y+6,132,26,'#111c31');for(let i=0;i<16;i++){this.rect(x+10+i*8,y+9,2,2,'#b9957177');this.rect(x+10+i*8,y+19,3,2,'#69748d');}this.seatedPatient(x+73,y+21,.5);this.rect(x+41,y+45,65,4,'#75657f');this.rect(x+79,y+29,17,13,'#5b7891');this.rect(x+81,y+31,13,9,'#20394c');this.text('21:47',x+5,y+50,'#dda982',5);}
-    if(index===2){this.rect(x+57,y+3,35,52,'#0b0c19');this.rect(x+60,y+6,29,45,'#4c5267');for(let i=0;i<4;i++){this.rect(x+63,y+10+i*9,23,6,i%2?'#777388':'#c17d9a');this.rect(x+65,y+12+i*9,17,1,'#2d243e');}this.rect(x+72,y+51,5,2,'#858299');this.text('7 NEW MESSAGES',x+5,y+51,'#b78ba8',4);}
-    if(index===3){for(let i=0;i<4;i++){this.rect(x+12+i*33,y+6,17,31,'#3b3e55');this.eye(x+20+i*33,y+18,7,0,'#9b8d9f');}this.rect(x+13,y+40,121,8,'#746176');this.boss(x+116,y+10,0);this.seatedPatient(x+52,y+29,.48);for(let i=0;i<7;i++)this.rect(x+72+i*5,y+38-i,4,2,'#b7a6a1');}
+    if(index===3){this.rect(x+57,y+3,35,52,'#0b0c19');this.rect(x+60,y+6,29,45,'#4c5267');for(let i=0;i<4;i++){this.rect(x+63,y+10+i*9,23,6,i%2?'#777388':'#c17d9a');this.rect(x+65,y+12+i*9,17,1,'#2d243e');}this.rect(x+72,y+51,5,2,'#858299');this.text('7 NEW MESSAGES',x+5,y+51,'#b78ba8',4);}
+    if(index===2){for(let i=0;i<4;i++){this.rect(x+12+i*33,y+6,17,31,'#3b3e55');this.eye(x+20+i*33,y+18,7,0,'#9b8d9f');}this.rect(x+13,y+40,121,8,'#746176');this.boss(x+116,y+10,0);this.seatedPatient(x+52,y+29,.48);for(let i=0;i<7;i++)this.rect(x+72+i*5,y+38-i,4,2,'#b7a6a1');}
   }
 }

@@ -20,7 +20,7 @@ describe('タッチ操作',()=>{
     pointer(0,'pointerdown');expect(input.take()).toEqual(['ArrowLeft']);expect(input.repeat(.3)).toEqual(['ArrowLeft']);expect(unlock).toHaveBeenCalled();
     pointer(0,'pointerup');expect(input.repeat(.3)).toEqual([]);expect(input.held.size).toBe(0);
   });
-  it('複数の指で移動と速い落下を同時に操作でき、キャンセルでも解除する',()=>{
+  it('複数の指でメニューの上下を同時に操作でき、キャンセルでも解除する',()=>{
     pointer(0,'pointerdown',1);pointer(1,'pointerdown',2);expect(input.held.has('ArrowDown')).toBe(true);
     pointer(0,'pointercancel',1);expect(input.held.has('ArrowLeft')).toBe(false);expect(input.held.has('ArrowDown')).toBe(true);
     pointer(1,'lostpointercapture',2);expect(input.held.size).toBe(0);

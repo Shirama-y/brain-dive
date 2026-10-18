@@ -1,57 +1,19 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SOLUTION_01 } from '../puzzle/solution01.testdata';
-import { Game } from './Game';
-let win: EventTarget, canvas: HTMLCanvasElement;
-beforeEach(()=>{
-  win=new EventTarget();
-  const context=new Proxy({measureText:(s:string)=>({width:s.length*7})},{get:(obj,k)=>k in obj?obj[k as keyof typeof obj]:(()=>{})});
-  canvas=Object.assign(new EventTarget(),{getContext:()=>context}) as unknown as HTMLCanvasElement;
-  vi.stubGlobal('window',win);
-  vi.stubGlobal('document',Object.assign(new EventTarget(),{activeElement:canvas,querySelector:()=>({textContent:''})}));
-  vi.stubGlobal('requestAnimationFrame',vi.fn());
-  vi.stubGlobal('localStorage',{getItem:()=>null,setItem:vi.fn()});
-});
+import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
+import {Game} from './Game';
+let win:EventTarget,canvas:HTMLCanvasElement;
+beforeEach(()=>{win=new EventTarget();const context=new Proxy({measureText:(s:string)=>({width:s.length*7})},{get:(obj,k)=>k in obj?obj[k as keyof typeof obj]:(()=>{})});canvas=Object.assign(new EventTarget(),{getContext:()=>context}) as unknown as HTMLCanvasElement;vi.stubGlobal('window',win);vi.stubGlobal('document',Object.assign(new EventTarget(),{activeElement:canvas,querySelector:()=>({textContent:''})}));vi.stubGlobal('requestAnimationFrame',vi.fn());vi.stubGlobal('localStorage',{getItem:()=>null,setItem:vi.fn()});});
 afterEach(()=>vi.unstubAllGlobals());
 function tick(g:Game,dt=1/60){(g as unknown as {update(dt:number):void}).update(dt);}
-function press(g:Game,code:string){for(const type of ['keydown','keyup']){const e=Object.assign(new Event(type),{code,repeat:false});win.dispatchEvent(e);}tick(g);}
-function enterPuzzle(g:Game,choice:number,skipDive=true){
-  press(g,'Enter');expect(g.scene).toBe('ROOM_INTRO');tick(g,3.1);expect(g.scene).toBe('DIALOGUE');
-  for(let i=0;i<3;i++){press(g,'Enter');press(g,'Enter');}expect(g.scene).toBe('QUESTION');
-  for(let i=0;i<choice;i++)press(g,'ArrowDown');press(g,'Enter');expect(g.question).toBe(choice);
-  for(let i=0;i<2;i++){press(g,'Enter');press(g,'Enter');}expect(g.scene).toBe('DIVE');if(skipDive){press(g,'Enter');if(g.scene==='MEMORY')tick(g,.3);}
-}
-describe('セッションの通し体験',()=>{
-  for(const timed of [false,true])for(const choice of [0,1,2])it(`${timed?"落下":"思考"}・質問${choice+1}から記憶3枚・帰還・診断書・タイトルまで到達`,()=>{
-    const g=new Game(canvas);if(timed)g.toggleMode();enterPuzzle(g,choice);const shown:number[]=[];
-    for(const {x,rotation} of SOLUTION_01){
-      const dx=x-g.board.active!.x;for(let i=0;i<Math.abs(dx);i++)press(g,dx<0?'ArrowLeft':'ArrowRight');
-      for(let i=0;i<(rotation===3?1:rotation);i++)press(g,rotation===3?'KeyZ':'KeyX');
-      press(g,'Space');tick(g,.8);
-      while(g.scene==='MEMORY'){
-        shown.push(g.memory);const before=JSON.stringify(g.board);tick(g,5);expect(JSON.stringify(g.board)).toBe(before);
-        press(g,'Enter');if(g.scene==='MEMORY')tick(g,.3);
-      }
-    }
-    expect(shown).toEqual([1,2,3]);expect(g.scene).toBe('RETURN');tick(g,2.6);expect(g.scene).toBe('OUTRO');
-    for(let i=0;i<3;i++){press(g,'Enter');press(g,'Enter');}expect(g.scene).toBe('REPORT');press(g,'Enter');expect(g.scene).toBe('REPORT');press(g,'Enter');expect(g.scene).toBe('COMPLETE');press(g,'Enter');expect(g.scene).toBe('TITLE');
-  });
-  it('ポーズ中に重力・ターン・演出が進まず、復帰時に入力が漏れない',()=>{
-    const g=new Game(canvas);enterPuzzle(g,0);press(g,'Escape');const before=JSON.stringify(g.board),sceneTime=g.sceneTime;
-    press(g,'Space');tick(g,10);expect(JSON.stringify(g.board)).toBe(before);expect(g.sceneTime).toBe(sceneTime);
-    press(g,'Escape');expect(g.pause).toBe(false);expect(g.board.turns).toBe(0);press(g,'Space');expect(g.board.turns).toBe(1);
-  });
-  it('失敗後にRですぐ初期状態から再挑戦できる',()=>{const g=new Game(canvas);enterPuzzle(g,0);g.board.failed=true;press(g,'KeyR');expect(g.scene).toBe('PUZZLE');expect(g.board.failed).toBe(false);expect(g.board.turns).toBe(0);expect(g.board.active).not.toBeNull();});
-  it('Hのヒントは1回限り、設定はゲーム外へ保存する',()=>{const g=new Game(canvas);enterPuzzle(g,0);press(g,'KeyH');expect(g.hintUsed).toBe(true);const text=g.hintText;press(g,'ArrowRight');press(g,'KeyH');expect(g.hintText).toBe(text);press(g,'KeyM');expect(g.sound.muted).toBe(true);expect(localStorage.setItem).toHaveBeenCalled();});
-});
-
-it('暗転・専用アップ・脳内の遷移が終わるまで盤面を進めない',()=>{
-  const g=new Game(canvas);enterPuzzle(g,0,false);const before=JSON.stringify(g.board);
-  tick(g,1.5);expect(g.scene).toBe('DIVE');expect(JSON.stringify(g.board)).toBe(before);
-  tick(g,2.2);expect(g.scene).toBe('DIVE');expect(JSON.stringify(g.board)).toBe(before);
-  tick(g,.2);expect(g.scene).toBe('PUZZLE');expect(g.board.turns).toBe(0);
-});
-
-it('思考モードは時間経過で落下せず、比較用の落ちものへ切り替えられる',()=>{
- const g=new Game(canvas);enterPuzzle(g,0);const before=g.board.active!.y;tick(g,5);expect(g.board.active!.y).toBe(before);
- g.toggleMode();tick(g,.9);expect(g.board.active!.y).toBe(before+1);g.toggleMode();tick(g,5);expect(g.board.active!.y).toBe(before+1);
+function press(g:Game,code:string){for(const type of ['keydown','keyup'])win.dispatchEvent(Object.assign(new Event(type),{code,repeat:false}));tick(g);}
+function enter(g:Game,choice=0,skip=true){press(g,'Enter');tick(g,3.1);for(let i=0;i<3;i++){press(g,'Enter');press(g,'Enter');}expect(g.scene).toBe('QUESTION');for(let i=0;i<choice;i++)press(g,'ArrowDown');press(g,'Enter');for(let i=0;i<2;i++){press(g,'Enter');press(g,'Enter');}expect(g.scene).toBe('DIVE');if(skip)press(g,'Enter');}
+function interview(g:Game,index=3){tick(g,.5);const before=g.board.excavated;g.openInterview();expect(g.scene).toBe('INTERVIEW');g.answerInterview(index);tick(g,6);g.resumeExploration();press(g,'Enter');tick(g,.5);expect(g.board.excavated).toEqual(before);expect(g.board.focus).toBe(6);}
+function dig(g:Game,x:number,y:number){tick(g,.5);if(g.board.tile({x,y})!.open)return;if(g.board.focus===0)interview(g);g.dig({x,y});expect(g.board.tile({x,y})!.open,`dig ${x},${y}: ${g.board.message}`).toBe(true);tick(g,.5);if(g.scene==='MEMORY'){const before=JSON.stringify(g.board);tick(g,6);expect(JSON.stringify(g.board)).toBe(before);press(g,'Enter');}expect(g.scene).not.toBe('MEMORY');}
+function collect(g:Game,id:number){dig(g,4,1);dig(g,4,2);if(id===1){for(const [x,y]of [[3,2],[2,2],[1,2],[1,3]])dig(g,x,y);if(!g.board.focus)interview(g);g.observe({x:1,y:4});tick(g,.5);dig(g,1,4);dig(g,1,5);}if(id===2){for(const [x,y]of [[5,2],[6,2],[7,2],[8,2],[8,3]])dig(g,x,y);interview(g,0);dig(g,8,4);dig(g,8,5);}if(id===3)for(const [x,y]of [[4,3],[4,4],[4,5],[4,6],[4,7]])dig(g,x,y);}
+describe('掘削ゲームのセッション',()=>{
+ for(const choice of [0,1,2])it(`問診${choice+1}から記憶・追加問診・整理・帰還・診断書・タイトルまで`,()=>{const g=new Game(canvas);enter(g,choice);for(const id of [3,1,2])collect(g,id);expect(g.board.memories.size).toBe(3);g.openCards();const focus=g.board.focus;g.viewMemory(1);tick(g,6);press(g,'Enter');expect(g.scene).toBe('CARDS');expect(g.board.focus).toBe(focus);g.assignments={1:'event',2:'others',3:'interpretation'};g.classify();g.closeCards();dig(g,4,8);g.openCards();g.bossCard=2;g.selfCard=3;g.connect();g.closeCards();dig(g,4,9);dig(g,4,10);expect(g.scene).toBe('RETURN');tick(g,2.6);for(let i=0;i<3;i++){press(g,'Enter');press(g,'Enter');}expect(g.scene).toBe('REPORT');press(g,'Enter');press(g,'Enter');expect(g.scene).toBe('COMPLETE');press(g,'Enter');expect(g.scene).toBe('TITLE');});
+ it('時間が経っても自動で掘らず、ポーズ中はマウス相当の操作も停止する',()=>{const g=new Game(canvas);enter(g);const before=JSON.stringify(g.board);tick(g,100);expect(JSON.stringify(g.board)).toBe(before);press(g,'Escape');g.dig({x:4,y:1});g.observe({x:4,y:1});g.openInterview();tick(g,5);expect(JSON.stringify(g.board)).toBe(before);press(g,'Enter');g.dig({x:4,y:1});expect(g.board.focus).toBe(5);});
+ it('掘削演出中の連打で集中力を二重消費せず、Rで探索のみ初期化する',()=>{const g=new Game(canvas);enter(g);g.dig({x:4,y:1});g.dig({x:4,y:2});expect(g.board.focus).toBe(5);press(g,'KeyR');expect(g.board.excavated).toEqual(['4,0']);expect(g.board.focus).toBe(6);expect(g.scene).toBe('PUZZLE');});
+ it('矢印・Enter・O・C・Qから探索操作が使え、未発見は掘れない',()=>{const g=new Game(canvas);enter(g);press(g,'Enter');expect(g.board.tile({x:4,y:1})!.open).toBe(true);tick(g,.5);press(g,'ArrowDown');press(g,'KeyO');expect(g.board.focus).toBe(4);press(g,'KeyC');expect(g.scene).toBe('CARDS');press(g,'Escape');tick(g,.5);press(g,'KeyQ');expect(g.scene).toBe('INTERVIEW');});
+ it('設定保存と音声切替を維持する',()=>{const g=new Game(canvas);press(g,'KeyM');expect(g.sound.muted).toBe(true);expect(localStorage.setItem).toHaveBeenCalled();press(g,'ArrowDown');press(g,'Enter');expect(g.scene).toBe('SETTINGS');press(g,'ArrowDown');press(g,'ArrowRight');expect(g.sound.volume).toBe(.6);press(g,'ArrowDown');press(g,'Enter');expect(g.reduced).toBe(false);});
+ it('初回の潜行中は探索状態を進めず、終了後に探索できる',()=>{const g=new Game(canvas);enter(g,0,false);const before=JSON.stringify(g.board);tick(g,3.7);expect(g.scene).toBe('DIVE');expect(JSON.stringify(g.board)).toBe(before);tick(g,.2);expect(g.scene).toBe('PUZZLE');});
 });
