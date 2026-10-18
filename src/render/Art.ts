@@ -32,10 +32,10 @@ export class Art {
     r(-4,42,1,8,'#42465e');r(12,42,1,7,'#42465e');c.restore();
   }
   /** Close-up artwork drawn at native resolution; never a scaled walking sprite. */
-  faceCloseup(pupil=4,psychedelic=false) {
+  faceCloseup(psychedelic=false) {
     if(this.novel.draw(this.c,'closeup',0,0,320,180)){
       if(psychedelic)this.intrusion(1,false,.17);
-      this.c.fillStyle='#070911';this.c.beginPath();this.c.arc(185,58,Math.max(0,pupil-4),0,Math.PI*2);this.c.fill();return;
+      return;
     }
     this.rect(0,0,320,180,'#10121e');
     this.polygon([[39,180],[57,150],[102,131],[216,132],[267,153],[285,180]],'#484d64');
@@ -56,8 +56,8 @@ export class Art {
     this.line([[157,90],[152,111],[157,115],[166,113]],'#8a6d7b');this.line([[146,132],[160,130],[174,132]],'#75596a');this.line([[151,136],[167,137]],'#a1848d');
     for(const [x,y] of [[120,107],[123,110],[126,112],[198,110],[201,107],[135,123],[207,91]])this.rect(x,y,2,1,'#a48a91');
     this.rect(187,80,2,2,'#dcd3ca');
-    // Only the dark opening expands; the face and its pixels stay fixed.
-    const radius=Math.max(4,Math.round(pupil));
+    // Fixed iris detail; transitions never expand a black mask.
+    const radius=4;
     for(let dy=-radius;dy<=radius;dy+=2){const w=Math.floor(Math.sqrt(radius*radius-dy*dy));this.rect(185-w,85+dy,w*2+1,2,'#070911');}
   }
   room(t:number,patientX=106,seated=true) {

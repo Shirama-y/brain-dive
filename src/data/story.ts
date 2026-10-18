@@ -15,3 +15,11 @@ export const outro = [
   {speaker:'カウンセラー',text:'焦らず、話せることから続けていきましょう。'},
   {speaker:'カウンセラー',text:'医師が診察と評価を行い、書類を確認しました。まずは休養と、継続した相談を。'}
 ];
+
+// The player advances each line; the patient agrees before the first dive.
+export const diveIntroduction = [
+  {speaker:'カウンセラー',text:'その声を、無理に消そうとしなくて大丈夫です。いま感じていることを、景色として一緒に眺めてみませんか。'},
+  {speaker:'カウンセラー',text:'そこには、不安の強い場所と、安心して触れられる場所があります。まずは、見えるところから少しずつ。'},
+  {speaker:'カウンセラー',text:'怖くなったり、迷ったりしたら、いつでも話に戻りましょう。話せたことが、金色の手がかりになります。'},
+  {speaker:'田辺 悠介',text:'……少しずつなら、やってみたいです。ここにいることを、忘れないようにします。'}
+];
