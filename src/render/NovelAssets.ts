@@ -1,5 +1,5 @@
-export type NovelImage = 'scenes'|'patient'|'closeup'|'brain';
-const files:Record<NovelImage,string>={scenes:'novel-scenes.png',patient:'patient-seated.png',closeup:'novel-closeup.png',brain:'novel-brain.png'};
+export type NovelImage = 'scenes'|'clinic'|'closeup'|'brain';
+const files:Record<NovelImage,string>={scenes:'novel-scenes.png',clinic:'clinic-seated-v2.png',closeup:'novel-closeup.png',brain:'novel-brain.png'};
 /** Original illustration layers remain high resolution; puzzle coordinates stay 320×180. */
 export class NovelAssets {
   private images:Partial<Record<NovelImage,HTMLImageElement>>={};

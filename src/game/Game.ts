@@ -18,7 +18,7 @@ export class Game {
   renderer=new ExcavationRenderer();effects=new ExcavationEffects();
   assignments:Partial<Record<number,Category>>={};bossCard=0;selfCard=0;
   interviewAnswer='';private interviewPoint:Point={x:8,y:4};private memoryReturn:'PUZZLE'|'CARDS'='PUZZLE';
-  titleSelected=0; settingsSelected=0;private lastGlyph=0;
+  settingsSelected=0;private lastGlyph=0;
   private previous=0; private accumulator=0; private stampPlayed=false;
   constructor(public canvas:HTMLCanvasElement) {
     this.art=new Art(canvas.getContext('2d')!);this.input=new Input(canvas);
@@ -30,6 +30,7 @@ export class Game {
   }
   save(){try{localStorage.setItem('brain-dive-settings',JSON.stringify({reduced:this.reduced,muted:this.sound.muted,volume:this.sound.volume}));}catch{}this.syncSound();}
   syncSound(){document.querySelector('#sound')!.textContent=this.sound.muted?'SOUND OFF':'SOUND ON';}
+  openSettings(){this.settingsSelected=0;this.change('SETTINGS');}
   toggleSound(){this.sound.unlock();this.sound.muted=!this.sound.muted;this.save();}
   change(scene:Scene) {this.scene=scene;if(scene==='MEMORY')this.sound.play('memory');if(scene==='RETURN')this.sound.play('win');this.sceneTime=0;this.typed=0;this.input.clear();document.querySelector('#scene-label')!.textContent=`BRAIN DIVE / ${labels[scene]}`;document.querySelector('#state-label')!.textContent=scene==='TITLE'?'SESSION READY':scene==='COMPLETE'?'SESSION COMPLETE':`CASE 001 · ${labels[scene]}`;}
   start(){this.board=new ExcavationBoard();this.assignments={};this.bossCard=0;this.selfCard=0;this.effects.remaining=0;this.line=0;this.selected=0;this.pause=false;this.sound.play('confirm');this.change('ROOM_INTRO');}
@@ -56,7 +57,7 @@ export class Game {
     if(key==='KeyM'){this.toggleSound();return;}
     if(key==='Escape'){if(this.scene==='CARDS'&&!this.pause){this.closeCards();return;}if(this.scene==='SETTINGS'){this.change('TITLE');return;}if(!['TITLE','COMPLETE'].includes(this.scene)){this.pause=!this.pause;this.input.clear();}return;}
     if(this.pause){if(key==='KeyR'){this.retry();}else if(key==='Enter')this.pause=false;return;}
-    if(this.scene==='TITLE') {if(['ArrowUp','ArrowDown'].includes(key)){this.titleSelected=1-this.titleSelected;this.sound.play('step');}if(confirm(key)){if(this.titleSelected===0)this.start();else this.change('SETTINGS');}return;}
+    if(this.scene==='TITLE'){if(confirm(key))this.start();return;}
     if(this.scene==='SETTINGS'){
       if(key==='ArrowUp')this.settingsSelected=(this.settingsSelected+3)%4;if(key==='ArrowDown')this.settingsSelected=(this.settingsSelected+1)%4;
       if(['ArrowLeft','ArrowRight'].includes(key)&&this.settingsSelected===1){this.sound.volume=Math.round(Math.max(0,Math.min(1,this.sound.volume+(key==='ArrowRight'?.1:-.1)))*10)/10;this.save();}
@@ -97,8 +98,8 @@ export class Game {
   private puzzle(){this.renderer.draw(this.art,this.board,this.time,this.reduced,this.effects);}
   private draw(){const a=this.art,c=a.c;c.globalAlpha=1;const scale=(this.canvas.width||320)/320;c.setTransform(scale,0,0,scale,0,0);a.rect(0,0,320,180,'#090912');
     if(!this.art.ready&&!['TITLE','SETTINGS'].includes(this.scene)){a.text('記憶の輪郭を、読み込んでいます。',160,82,'#d6bdcf',9,'center');return;}
-    if(this.scene==='TITLE'){a.title(this.time,this.reduced);a.text(this.titleSelected===0?'◆':' ',23,139,'#e4ad9a',7);a.text('はじめる',37,139,this.titleSelected===0?'#f1dfc7':'#84798e',8);a.text(this.titleSelected===1?'◆':' ',105,140,'#e4ad9a',7);a.text('設定',119,140,this.titleSelected===1?'#f1dfc7':'#84798e',7);a.text('↑ ↓ 選択    ENTER 決定',21,157,'#71677f',4);}
-    else if(this.scene==='SETTINGS'){a.title(this.time,this.reduced);a.box(48,26,224,129,'#b69db8','#12111e');a.text('SETTINGS / 設定',65,39,'#e5d1ba',8);const settings=[`サウンド：${this.sound.muted?'OFF':'ON'}`,`音量：${Math.round(this.sound.volume*100)}%  ← →`,`動き・点滅の軽減：${this.reduced?'ON':'OFF'}`,'タイトルへ戻る'];settings.forEach((s,i)=>{a.text(i===this.settingsSelected?'◆':'',64,63+i*18,'#e5acb0',7);a.text(s,78,63+i*18,i===this.settingsSelected?'#e9dccb':'#8a819a',7);});a.text('ENTER 変更 / ESC 戻る',160,143,'#8a819a',5,'center');}
+    if(this.scene==='TITLE')return;
+    else if(this.scene==='SETTINGS'){a.room(this.time);c.globalAlpha=.7;a.rect(0,0,320,180,'#080b14');c.globalAlpha=1;a.box(48,26,224,129,'#b69db8','#12111e');a.text('SETTINGS / 設定',65,39,'#e5d1ba',8);const settings=[`サウンド：${this.sound.muted?'OFF':'ON'}`,`音量：${Math.round(this.sound.volume*100)}%  ← →`,`動き・点滅の軽減：${this.reduced?'ON':'OFF'}`,'タイトルへ戻る'];settings.forEach((s,i)=>{a.text(i===this.settingsSelected?'◆':'',64,63+i*18,'#e5acb0',7);a.text(s,78,63+i*18,i===this.settingsSelected?'#e9dccb':'#8a819a',7);});a.text('ENTER 変更 / ESC 戻る',160,143,'#8a819a',5,'center');}
     else if(['ROOM_INTRO','DIALOGUE','QUESTION','ANSWER','OUTRO'].includes(this.scene)){a.room(this.time,this.scene==='ROOM_INTRO'?65+Math.min(1,this.sceneTime/2.5)*46:111,this.scene!=='ROOM_INTRO'||this.sceneTime>2.5);if(['DIALOGUE','ANSWER','OUTRO'].includes(this.scene))this.dialogue();if(this.scene==='ROOM_INTRO'){a.box(7,135,306,39);a.text('扉が、静かに開く。',19,147,'#aca0b3',7);a.text('ENTER 進む',301,162,'#726b82',5,'right');}if(this.scene==='QUESTION'){a.box(7,115,306,59);a.text('どの言葉から、たどってみよう。',17,121,'#a58ba7',6);questions.forEach((s,i)=>{a.text(i===this.selected?'◆':'',18,135+i*11,'#e2a8aa',6);a.text(s,32,135+i*11,i===this.selected?'#efe2d2':'#8c819a',7);});}}
     else if(this.scene==='DIVE') {
       const t=this.sceneTime;

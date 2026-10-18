@@ -9,7 +9,7 @@ import {Game} from './game/Game';
 const element=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const canvas=element<HTMLCanvasElement>('game'),viewport=element('viewport'),consoleElement=document.querySelector<HTMLElement>('.console')!;
 const game=new Game(canvas),mapRoot=element('map-controls');
-const focus=()=>canvas.focus({preventScroll:true});
+const focus=()=>game.scene==='TITLE'?element('start-game').focus({preventScroll:true}):canvas.focus({preventScroll:true});
 const action=(fn:()=>void)=>()=>{game.sound.unlock();fn();consoleElement.setAttribute('aria-busy',String(game.effects.remaining>0));focus();};
 bindTouchControls(element('touch-controls'),game.input,focus,()=>game.sound.unlock());
 // Overlay matches the displayed canvas, including letterboxing and fractional phone scaling.
@@ -36,10 +36,12 @@ element<HTMLSelectElement>('boss-card').addEventListener('change',e=>game.bossCa
 let targetOptions='';
 element<HTMLSelectElement>('target-picker').addEventListener('change',e=>{const [x,y]=(e.target as HTMLSelectElement).value.split(',').map(Number);game.selectTile({x,y});});
 const setText=(id:string,value:string)=>{const el=element(id);if(el.textContent!==value)el.textContent=value;};
+let previousScene=game.scene;
+function syncPresentation(){const title=game.scene==='TITLE';consoleElement.hidden=title;element('guide').hidden=title;document.querySelector<HTMLElement>('.hero')!.hidden=!title;document.querySelector<HTMLElement>('.session-heading')!.hidden=title;document.querySelector<HTMLElement>('.below')!.hidden=title;document.body.classList.toggle('is-playing',!title);if(title&&previousScene!=='TITLE'){element('start-game').focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});}previousScene=game.scene;}
 function updateUI(){const b=game.board,puzzle=game.scene==='PUZZLE'&&!game.pause,cards=game.scene==='CARDS'&&!game.pause,interview=game.scene==='INTERVIEW'&&!game.pause;
  consoleElement.setAttribute('aria-busy',String(game.effects.remaining>0));
  const sound=element('sound');sound.setAttribute('aria-label',game.sound.muted?'音楽を有効にする':`音楽をミュート（${game.sound.playing?'再生中':'開始待ち'}：${game.sound.track}）`);sound.setAttribute('aria-pressed',String(!game.sound.muted));sound.title=game.sound.track;
- document.body.classList.toggle('is-playing',!['TITLE','SETTINGS'].includes(game.scene));
+ syncPresentation();setText('title-sound',game.sound.muted?'音楽 OFF':'音楽 ON');element('title-sound').setAttribute('aria-pressed',String(!game.sound.muted));
  element('excavation-ui').hidden=!puzzle;element('cards-panel').hidden=!cards;element('interview-panel').hidden=!interview;mapRoot.hidden=!puzzle;
  for(const button of mapButtons){const p={x:Number(button.dataset.x),y:Number(button.dataset.y)},t=b.tile(p)!;const state=b.state(p);const label=`${p.x+1}列${p.y+1}行 ${t.seen?TILE_NAMES[t.kind]:'未発見'} / ${{unknown:'未発見',discovered:'発見済み',diggable:'掘削可能',excavated:'通路',sealed:'封印中',released:'解放済み'}[state]}`;
  if(button.getAttribute('aria-label')!==label)button.setAttribute('aria-label',label);button.disabled=!t.seen;button.tabIndex=t.seen&&t.kind!=='WALL'?0:-1;
@@ -67,5 +69,7 @@ function updateUI(){const b=game.board,puzzle=game.scene==='PUZZLE'&&!game.pause
 updateUI();mobile.addEventListener('change',resize);new ResizeObserver(resize).observe(viewport);window.addEventListener('resize',resize);document.addEventListener('fullscreenchange',resize);resize();game.syncSound();focus();
 click('sound',()=>game.toggleSound());element('fullscreen').addEventListener('click',async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await consoleElement.requestFullscreen();}catch{}resize();focus();});
 element('help').addEventListener('click',()=>{const guide=element<HTMLDetailsElement>('guide');guide.open=!guide.open;if(guide.open)guide.scrollIntoView({behavior:'smooth',block:'nearest'});});
-function startWithSound(muted:boolean){game.sound.unlock();game.sound.muted=muted;game.save();game.start();focus();requestAnimationFrame(()=>consoleElement.scrollIntoView({behavior:'smooth',block:'start'}));}
-element('play-music').addEventListener('click',()=>startWithSound(false));element('play-silent').addEventListener('click',()=>startWithSound(true));element('jump-game').addEventListener('click',()=>{consoleElement.scrollIntoView({behavior:'smooth',block:'start'});focus();});
+function startSession(){game.sound.unlock();game.start();syncPresentation();resize();focus();requestAnimationFrame(()=>consoleElement.scrollIntoView({behavior:'instant',block:'start'}));}
+element('start-game').addEventListener('click',startSession);
+click('title-sound',()=>game.toggleSound());
+element('open-settings').addEventListener('click',()=>{game.openSettings();syncPresentation();resize();focus();requestAnimationFrame(()=>consoleElement.scrollIntoView({behavior:'instant',block:'start'}));});

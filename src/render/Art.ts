@@ -61,12 +61,12 @@ export class Art {
     for(let dy=-radius;dy<=radius;dy+=2){const w=Math.floor(Math.sqrt(radius*radius-dy*dy));this.rect(185-w,85+dy,w*2+1,2,'#070911');}
   }
   room(t:number,patientX=106,seated=true) {
-    if(this.novel.draw(this.c,'scenes',0,0,320,180,0)){
+    if(this.novel.draw(this.c,'clinic',0,0,320,180)){
+      // The patient, chair, contact shadows and room share one lighting/perspective pass.
+      // Fade the complete scene on entry instead of sliding a luminous portrait over it.
       const progress=seated?1:Math.max(0,Math.min(1,(patientX-65)/46));
-      this.c.save();this.c.globalAlpha=progress;
-      const image=this.novel.get('patient');if(image){const h=174,w=h*image.naturalWidth/image.naturalHeight;this.novel.draw(this.c,'patient',39-(1-progress)*18,6,w,h);}
-      this.c.restore();
-      this.c.save();this.c.globalAlpha=.22;for(let i=0;i<15;i++)this.rect(204+(i*29)%104,25+(i*19+Math.floor(t*2))%88,1,1,'#e2bd8b');this.c.restore();
+      this.c.save();this.c.globalAlpha=1-progress;this.rect(0,0,320,180,'#090c15');this.c.restore();
+      this.c.save();this.c.globalAlpha=.1;for(let i=0;i<12;i++)this.rect(204+(i*29)%104,25+(i*19+Math.floor(t*2))%88,1,1,'#e2bd8b');this.c.restore();
       return;
     }
     this.rect(0,0,320,180,'#0b101c');this.rect(0,0,320,14,'#10121e');this.rect(0,14,320,85,'#1c2030');
@@ -142,19 +142,6 @@ export class Art {
     if(kind==='GUILT'){this.rect(x+1,y+2,2,1,ink);this.rect(x+6,y+2,2,1,ink);this.rect(x+4,y+6,1,1,ink);}
     if(kind==='FATIGUE'){this.rect(x+2,y+3,2,1,ink);this.rect(x+5,y+3,2,1,ink);this.rect(x+3,y+6,3,1,ink);}
 
-  }
-  title(t:number,reduced:boolean) {
-    // A waiting-room title rather than an enlarged copy of the puzzle board.
-    this.room(t,65,false);const c=this.c;
-    c.globalAlpha=.72;this.rect(0,0,320,180,'#070a14');c.globalAlpha=1;
-    this.rect(17,15,128,148,'#080c17cc');
-    this.rect(180,15,116,150,'#080c1777');
-    this.eye(243,44,15,t,'#bb8baa');
-    this.text('CASE FILE 001',28,27,'#c3a88b',5);this.text('BRAIN',26,44,'#eee4dc',23);this.text('DIVE',26,70,'#eee4dc',23);
-    this.text('— 診 断 書 —',30,103,'#ceb8c6',8);this.text('その声を、ほどく。',30,119,'#9d899e',6);
-    this.text('月曜の朝',237,99,'#d5b7aa',8,'center');this.text('田辺 悠介 / 28',237,114,'#8c8296',5,'center');
-    if(!reduced){for(let i=0;i<10;i++){const y=24+(i*17)%120;this.rect(191+(i*11)%87,y,2+((i*13+Math.floor(t*4))%12),1,'#b93c8c66');}}
-    this.text('HEADPHONES RECOMMENDED',21,171,'#7c6d88',4);
   }
   intrusion(t:number,reduced:boolean,strength:number) {
     const c=this.c;c.save();c.globalAlpha=strength;
