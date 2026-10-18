@@ -1,5 +1,5 @@
 export type MusicMood = 'waiting'|'room'|'dive'|'brain'|'memory'|'return'|'report';
-export type SoundCue = 'step'|'confirm'|'clear'|'dive'|'stamp'|'crack'|'release'|'memory'|'boss'|'win'|'type'|'dig'|'observe'|'breath';
+export type SoundCue = 'step'|'confirm'|'clear'|'dive'|'stamp'|'crack'|'release'|'memory'|'boss'|'win'|'type'|'dig'|'observe'|'breath'|'blast';
 export const midiToHz = (midi:number) => 440*Math.pow(2,(midi-69)/12);
 const ROOTS=[45,41,48,43];
 const MOTIF=[12,19,24,22,19,15,14,19,12,19,27,24,22,19,15,14];
@@ -69,7 +69,7 @@ export class Sound {
       notes.forEach((note,i)=>this.note(note,now+i*.095,1.5,.05,'sine',true));return;
     }
     if(kind==='boss'){[33,34,45].forEach((note,i)=>this.note(note,now+i*.05,.8,.04,'triangle',true));return;}
-    const params:Record<string,number[]>={dig:[115,38,.2,.09],observe:[420,630,.18,.035],step:[100,70,.035,.035],confirm:[330,520,.1,.07],clear:[660,220,.35,.09],dive:[150,35,.9,.075],stamp:[90,40,.15,.1],crack:[430,180,.2,.065],type:[720,600,.02,.01]};
+    const params:Record<string,number[]>={blast:[75,24,.55,.12],dig:[115,38,.2,.09],observe:[420,630,.18,.035],step:[100,70,.035,.035],confirm:[330,520,.1,.07],clear:[660,220,.35,.09],dive:[150,35,.9,.075],stamp:[90,40,.15,.1],crack:[430,180,.2,.065],type:[720,600,.02,.01]};
     const p=params[kind]??params.clear,o=c.createOscillator(),g=c.createGain();
     o.type=kind==='clear'?'sine':'triangle';o.frequency.setValueAtTime(p[0],now);o.frequency.exponentialRampToValueAtTime(p[1],now+p[2]);g.gain.setValueAtTime(p[3],now);g.gain.exponentialRampToValueAtTime(.0001,now+p[2]);o.connect(g);g.connect(this.effects);o.start(now);o.stop(now+p[2]);o.onended=()=>{o.disconnect();g.disconnect();};
   }

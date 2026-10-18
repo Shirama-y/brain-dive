@@ -1,4 +1,4 @@
-const captured = new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space','Enter','Escape','KeyO','KeyC','KeyQ','KeyR','KeyM']);
+const captured = new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space','Enter','Escape','KeyF','KeyH','KeyQ','KeyR','KeyM']);
 export class Input {
   held = new Set<string>(); private pressed: string[]=[]; private elapsed=new Map<string,number>();
   constructor(private canvas:HTMLCanvasElement) {
