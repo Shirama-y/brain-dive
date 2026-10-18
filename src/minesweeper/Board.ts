@@ -50,7 +50,7 @@ export class MinesweeperBoard {
   if(v.state==='exploded'||v.state==='mine')return '地雷。患者がパニックに陥り、セッションを続けられなくなった。';
   if(v.state==='flagged')return v.wrongFlag?'安全なマスに置かれていた旗です。':'旗：地雷と思う場所の印。旗を外すまで開きません。';
   if(v.state==='hint')return '安全ヒント：カウンセリングで見えた、地雷のないマスです。開いて大丈夫。';
-  if(v.memoryId)return `記憶の断片「${fragmentById(v.memoryId).title}」を見つけたマスです。記録から読み返せます。周囲の地雷 ${v.adjacent} 個。`;
+  if(v.memoryId)return `記憶の断片「${fragmentById(v.memoryId).title}」を見つけたマスです。記憶を思い出したマスです。周囲の地雷 ${v.adjacent} 個。`;
   if(v.state==='open')return v.adjacent?`周囲8マスに地雷が ${v.adjacent} 個あります。斜めも数えます。`:'周囲8マスに地雷はありません。';
   return `${FEELINGS[feelingAt(p)]}：未開封。数字は近くの不安の核の数。迷ったら話を聞き、金色の安心マスを開きましょう。最初の一手は安全です。`;
  }
@@ -66,7 +66,7 @@ export class MinesweeperBoard {
   }
   discoveries.sort((a,b)=>fragmentById(a).topic-fragmentById(b).topic);this.foundFragments.push(...discoveries);
   this.won=this.opened===this.safeTotal;
-  return this.result({ok:true,kind:this.won?'win':'open',discoveries,at:{x:p.x,y:p.y},message:discoveries.length?`記憶の断片を ${discoveries.length} つ発見。患者の言葉を、記録から読み返せます。${this.won?'安全なマスをすべて開きました。':''}`:this.won?'安全なマスをすべて開いた。患者の呼吸が落ち着いてきた。':`${this.opened} / ${this.safeTotal} マスを開いた。迷ったらカウンセリングで安全なヒントを得られます。`});
+  return this.result({ok:true,kind:this.won?'win':'open',discoveries,at:{x:p.x,y:p.y},message:discoveries.length?`記憶の断片を ${discoveries.length} つ発見。患者の言葉が、脳裏をよぎる。${this.won?'安全なマスをすべて開きました。':''}`:this.won?'安全なマスをすべて開いた。患者の呼吸が落ち着いてきた。':`${this.opened} / ${this.safeTotal} マスを開いた。迷ったらカウンセリングで安全なヒントを得られます。`});
  }
  toggleFlag(p:Point):MoveResult{const c=this.tile(p);this.selected={x:p.x,y:p.y};if(!c||c.open||this.finished)return {ok:false,message:'未開封のマスに旗を立てられます。'};
   c.flagged=!c.flagged;return this.result({ok:true,kind:'flag',at:{x:p.x,y:p.y},message:c.flagged?'旗を立てた。旗は印なので、正解とは限りません。':'旗を外した。このマスを開けるようになりました。'});

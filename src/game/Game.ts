@@ -9,17 +9,24 @@ import { intro, questions, replies, lastLine, outro, diveIntroduction } from '..
 import {diveShotAt,DIVE_DURATION} from '../render/DiveTransition';
 import { Input } from './Input';
 import { Sound } from './Audio';
-type Scene = 'TITLE'|'SETTINGS'|'ROOM_INTRO'|'DIALOGUE'|'QUESTION'|'ANSWER'|'DIVE'|'PUZZLE'|'INTERVIEW'|'EXPLOSION'|'GAMEOVER'|'RETURN'|'OUTRO'|'REPORT'|'COMPLETE';
+export const CUTIN_DURATION=3.2;
+type Scene = 'CUTIN'|'TITLE'|'SETTINGS'|'ROOM_INTRO'|'DIALOGUE'|'QUESTION'|'ANSWER'|'DIVE'|'PUZZLE'|'INTERVIEW'|'EXPLOSION'|'GAMEOVER'|'RETURN'|'OUTRO'|'REPORT'|'COMPLETE';
 const confirm=(key:string)=>['Enter','Space'].includes(key);
-const labels:Record<Scene,string>={TITLE:'待合室',SETTINGS:'設定',ROOM_INTRO:'患者入室',DIALOGUE:'問診',QUESTION:'問診',ANSWER:'問診',DIVE:'潜行中',PUZZLE:'月曜の朝',EXPLOSION:'爆発',GAMEOVER:'ゲームオーバー',INTERVIEW:'カウンセリング',RETURN:'帰還中',OUTRO:'診療室',REPORT:'診断書',COMPLETE:'セッション終了'};
+const labels:Record<Scene,string>={CUTIN:'記憶の断片',TITLE:'待合室',SETTINGS:'設定',ROOM_INTRO:'患者入室',DIALOGUE:'問診',QUESTION:'問診',ANSWER:'問診',DIVE:'潜行中',PUZZLE:'月曜の朝',EXPLOSION:'爆発',GAMEOVER:'ゲームオーバー',INTERVIEW:'カウンセリング',RETURN:'帰還中',OUTRO:'診療室',REPORT:'診断書',COMPLETE:'セッション終了'};
 export class Game {
   art:Art; input:Input; sound=new Sound();
   scene:Scene='TITLE'; sceneTime=0; time=0; selected=0; question=0; line=0; typed=0;
   reduced=true;pause=false;board=new MinesweeperBoard();flagMode=false;
   renderer=new MinesweeperRenderer();effects=new MinesweeperEffects();
-  activeFragmentId?:FragmentId;
-  get currentFragment(){return this.activeFragmentId?fragmentById(this.activeFragmentId):undefined;}
-  readFragment(id:FragmentId){if(!this.pause&&this.board.foundFragments.includes(id)){this.activeFragmentId=id;}}
+  private cutinQueue:FragmentId[]=[];private cutinNext:'PUZZLE'|'RETURN'='PUZZLE';
+  get currentFragment(){return this.cutinQueue[0]?fragmentById(this.cutinQueue[0]):undefined;}
+  get cutinsLeft(){return this.cutinQueue.length;}
+  advanceCutin(){
+    if(this.scene!=='CUTIN'||this.pause||this.sceneTime<.35)return;
+    this.cutinQueue.shift();
+    if(this.cutinQueue.length){this.sound.play('memory');this.change('CUTIN');}
+    else{this.effects.remaining=0;if(this.cutinNext==='RETURN')this.sound.play('breath');this.change(this.cutinNext);}
+  }
   interviewAnswer='';private interviewPoint:Point={x:4,y:5};
   settingsSelected=0;private lastGlyph=0;private returningToMind=false;private lastDiveShot=0;
   get diveCaption(){return diveShotAt(this.sceneTime,this.reduced,this.returningToMind).caption;}
@@ -37,8 +44,8 @@ export class Game {
   openSettings(){this.settingsSelected=0;this.change('SETTINGS');}
   toggleSound(){this.sound.unlock();this.sound.muted=!this.sound.muted;this.save();}
   change(scene:Scene) {this.scene=scene;if(scene==='DIVE')this.lastDiveShot=0;if(scene==='RETURN')this.sound.play('win');this.sceneTime=0;this.typed=0;this.input.clear();document.querySelector('#scene-label')!.textContent=`BRAIN DIVE / ${labels[scene]}`;document.querySelector('#state-label')!.textContent=scene==='TITLE'?'SESSION READY':scene==='COMPLETE'?'SESSION COMPLETE':`CASE 001 · ${labels[scene]}`;}
-  start(){this.activeFragmentId=undefined;this.returningToMind=false;this.board=new MinesweeperBoard();this.effects.remaining=0;this.flagMode=false;this.line=0;this.selected=0;this.pause=false;this.sound.play('confirm');this.change('ROOM_INTRO');}
-  retry(){this.activeFragmentId=undefined;this.board=new MinesweeperBoard();this.effects.remaining=0;this.flagMode=false;this.pause=false;this.change('PUZZLE');}
+  start(){this.cutinQueue=[];this.cutinNext='PUZZLE';this.returningToMind=false;this.board=new MinesweeperBoard();this.effects.remaining=0;this.flagMode=false;this.line=0;this.selected=0;this.pause=false;this.sound.play('confirm');this.change('ROOM_INTRO');}
+  retry(){this.cutinQueue=[];this.cutinNext='PUZZLE';this.board=new MinesweeperBoard();this.effects.remaining=0;this.flagMode=false;this.pause=false;this.change('PUZZLE');}
   returnToTitle(){this.pause=false;this.change('TITLE');}
   selectTile(p:Point){if(this.scene==='PUZZLE'&&!this.pause&&this.board.tile(p))this.board.selected={...p};}
   tap(p:Point){if(this.flagMode)this.flag(p);else this.openCell(p);}
@@ -46,9 +53,9 @@ export class Game {
   openCell(p=this.board.selected){if(this.scene!=='PUZZLE'||this.pause||this.effects.remaining>0)return;this.accept(this.board.open(p));}
   flag(p=this.board.selected){if(this.scene!=='PUZZLE'||this.pause)return;this.accept(this.board.toggleFlag(p));}
   private accept(result:MoveResult){if(!result.ok){this.sound.play('step');return;}
-    if(result.discoveries?.length){this.activeFragmentId=result.discoveries[0];this.sound.play('memory');}
     this.effects.start(result.at??this.board.selected,result.kind??'open');
     if(result.kind==='explode'){this.sound.play('blast');this.sound.play('boss');this.change('EXPLOSION');}
+    else if(result.discoveries?.length){this.cutinQueue=[...result.discoveries];this.cutinNext=result.kind==='win'?'RETURN':'PUZZLE';this.sound.play('memory');this.change('CUTIN');}
     else if(result.kind==='win'){this.sound.play('breath');this.change('RETURN');}
     else this.sound.play(result.kind==='flag'?'step':'dig');
   }
@@ -62,6 +69,7 @@ export class Game {
     if(this.scene==='GAMEOVER'){if(confirm(key)||key==='KeyR')this.retry();else if(key==='Escape')this.returnToTitle();return;}
     if(key==='Escape'){if(this.scene==='SETTINGS'){this.change('TITLE');return;}if(!['TITLE','COMPLETE'].includes(this.scene)){this.pause=!this.pause;this.input.clear();}return;}
     if(this.pause){if(key==='KeyR'){this.retry();}else if(key==='Enter')this.pause=false;return;}
+    if(this.scene==='CUTIN'){if(confirm(key))this.advanceCutin();return;}
     if(this.scene==='TITLE'){if(confirm(key))this.start();return;}
     if(this.scene==='SETTINGS'){
       if(key==='ArrowUp')this.settingsSelected=(this.settingsSelected+3)%4;if(key==='ArrowDown')this.settingsSelected=(this.settingsSelected+1)%4;
@@ -86,30 +94,37 @@ export class Game {
     if(!this.art.ready&&!['TITLE','SETTINGS'].includes(this.scene)){this.input.clear();this.sound.update('TITLE',this.pause);return;}
     // Consume at most one action at a scene boundary; no input leaks into the next scene.
     for(const key of this.input.take()){const before=this.scene;this.sound.unlock();this.key(key);if(this.scene!==before)break;}
-    this.sound.update(this.scene==='INTERVIEW'?'DIALOGUE':['EXPLOSION','GAMEOVER'].includes(this.scene)?'DIVE':this.scene,this.pause||this.scene==='GAMEOVER',this.board.failed);
+    this.sound.update(this.scene==='CUTIN'?'MEMORY':this.scene==='INTERVIEW'?'DIALOGUE':['EXPLOSION','GAMEOVER'].includes(this.scene)?'DIVE':this.scene,this.pause||this.scene==='GAMEOVER',this.board.failed);
     if(this.pause)return;
     this.effects.update(dt);
     this.sceneTime+=dt;this.typed+=dt*25;
     if(['DIALOGUE','ANSWER','OUTRO'].includes(this.scene)&&Math.floor(this.typed/3)!==this.lastGlyph&&this.typed<this.currentLine().text.length){this.lastGlyph=Math.floor(this.typed/3);this.sound.play('type');}
     if(this.scene==='ROOM_INTRO'&&this.sceneTime>3){this.line=0;this.change('DIALOGUE');}
     if(this.scene==='DIVE'){const shot=diveShotAt(this.sceneTime,this.reduced,this.returningToMind);if(shot.index!==this.lastDiveShot){this.sound.play('zap');this.lastDiveShot=shot.index;}if(this.sceneTime>DIVE_DURATION)this.change('PUZZLE');}
+    if(this.scene==='CUTIN'&&this.sceneTime>=CUTIN_DURATION)this.advanceCutin();
     if(this.scene==='EXPLOSION'&&this.sceneTime>1.8)this.change('GAMEOVER');
     if(this.scene==='RETURN'&&this.sceneTime>2.5){this.line=0;this.change('OUTRO');}
     if(this.scene==='REPORT'&&this.sceneTime>8&&!this.stampPlayed){this.sound.play('stamp');this.stampPlayed=true;}
   }
   private frame=(now:number)=>{const dt=this.previous?Math.min((now-this.previous)/1000,.1):0;this.previous=now;this.accumulator+=dt;while(this.accumulator>=1/60){this.update(1/60);this.accumulator-=1/60;}this.draw();requestAnimationFrame(this.frame);};
   private dialogue() {const a=this.art,l=this.currentLine();a.box(7,123,306,51,'#c5bfcb','#0a0b13');a.text(l.speaker,16,129,'#c3a68c',6);a.wrapped(l.text.slice(0,Math.floor(this.typed)),17,141,279,'#e9e3da',7,11);if(this.typed>=l.text.length&&Math.floor(this.time*2)%2)a.text('▼',301,162,'#bda4be',6);}
-  private puzzle(){this.renderer.draw(this.art,this.board,this.time,this.reduced,this.effects,this.currentFragment);}
+  private puzzle(){this.renderer.draw(this.art,this.board,this.time,this.reduced,this.effects);}
   private draw(){const a=this.art,c=a.c;c.globalAlpha=1;const scale=(this.canvas.width||320)/320;c.setTransform(scale,0,0,scale,0,0);a.rect(0,0,320,180,'#090912');
     if(!this.art.ready&&!['TITLE','SETTINGS'].includes(this.scene)){a.text('記憶の輪郭を、読み込んでいます。',160,82,'#d6bdcf',9,'center');return;}
     if(this.scene==='TITLE')return;
     else if(this.scene==='SETTINGS'){a.room(this.time);c.globalAlpha=.7;a.rect(0,0,320,180,'#080b14');c.globalAlpha=1;a.box(48,26,224,129,'#b69db8','#12111e');a.text('SETTINGS / 設定',65,39,'#e5d1ba',8);const settings=[`サウンド：${this.sound.muted?'OFF':'ON'}`,`音量：${Math.round(this.sound.volume*100)}%  ← →`,`動き・点滅の軽減：${this.reduced?'ON':'OFF'}`,'タイトルへ戻る'];settings.forEach((s,i)=>{a.text(i===this.settingsSelected?'◆':'',64,63+i*18,'#e5acb0',7);a.text(s,78,63+i*18,i===this.settingsSelected?'#e9dccb':'#8a819a',7);});a.text('ENTER 変更 / ESC 戻る',160,143,'#8a819a',5,'center');}
     else if(['ROOM_INTRO','DIALOGUE','QUESTION','ANSWER','OUTRO'].includes(this.scene)){a.room(this.time,this.scene==='ROOM_INTRO'?65+Math.min(1,this.sceneTime/2.5)*46:111,this.scene!=='ROOM_INTRO'||this.sceneTime>2.5);if(['DIALOGUE','ANSWER','OUTRO'].includes(this.scene))this.dialogue();if(this.scene==='ROOM_INTRO'){a.box(7,135,306,39);a.text('扉が、静かに開く。',19,147,'#aca0b3',7);a.text('ENTER 進む',301,162,'#726b82',5,'right');}if(this.scene==='QUESTION'){a.box(7,115,306,59);a.text('どの言葉から、たどってみよう。',17,121,'#a58ba7',6);questions.forEach((s,i)=>{a.text(i===this.selected?'◆':'',18,135+i*11,'#e2a8aa',6);a.text(s,32,135+i*11,i===this.selected?'#efe2d2':'#8c819a',7);});}}
+    else if(this.scene==='CUTIN') {
+      const memory=this.currentFragment!;
+      c.globalAlpha=this.reduced?1:Math.min(1,.4+this.sceneTime*4);a.fragment(memory.panel,0,0,320,180);c.globalAlpha=1;
+      a.rect(0,0,320,28,'#090b16b8');a.text('MEMORY / 記憶の断片',12,6,'#bfa4ba',5);a.text(memory.title,12,15,'#ecd1b1',8);
+      a.rect(0,130,320,50,'#090b16df');a.text('田辺 悠介',12,136,'#bfa4ba',5);a.wrapped(`「${memory.line}」`,12,146,296,'#f1e2e9',8,12);
+      a.text(this.cutinsLeft>1?'決定で次の断片へ':'決定でパズルへ',307,173,'#b9a4bc',4,'right');
+    }
     else if(this.scene==='DIVE') {
       const shot=diveShotAt(this.sceneTime,this.reduced,this.returningToMind);
       if(shot.image==='room')a.room(this.time);
-      else if(shot.image==='face')a.faceCloseup(false);
-      else this.puzzle();
+      else a.faceCloseup(false);
       if(shot.interference){
         // Brief horizontal signal breaks, confined to dark tinted bands.
         for(let i=0;i<5;i++){const y=(i*37+shot.index*13)%151;a.rect(0,y,320,2+i%3,i%2?'#331d475c':'#14394c66');a.rect((i*71+shot.index*29)%270,y+3,38,1,'#ba7ea66b');}
