@@ -104,7 +104,6 @@ export class Game {
       const shot=diveShotAt(this.sceneTime,this.reduced,this.returningToMind);
       if(shot.image==='room')a.room(this.time);
       else if(shot.image==='face')a.faceCloseup(false);
-      else if(shot.image==='brain')a.brain(this.time,this.reduced);
       else this.puzzle();
       if(shot.interference){
         // Brief horizontal signal breaks, confined to dark tinted bands.
@@ -122,13 +121,13 @@ export class Game {
       if(this.scene==='RETURN'){c.globalAlpha=Math.min(1,this.sceneTime/2);a.rect(0,0,320,180,'#13141e');c.globalAlpha=1;a.text('呼吸が、少しずつ落ち着いていく。',160,83,'#d4bdc6',8,'center');}
     }
     else if(this.scene==='EXPLOSION'||this.scene==='GAMEOVER'){
-      c.save();if(!this.reduced&&this.scene==='EXPLOSION')c.translate(Math.sin(this.time*35)*1.6,Math.cos(this.time*27));a.faceCloseup(false);c.globalAlpha=.55;a.rect(0,0,320,180,'#340c29');c.globalAlpha=1;
+      c.save();if(!this.reduced&&this.scene==='EXPLOSION')c.translate(Math.sin(this.time*35)*1.6,Math.cos(this.time*27));a.reprimand();c.globalAlpha=.18;a.rect(0,0,320,180,'#340c29');c.globalAlpha=1;
       if(this.scene==='EXPLOSION'){
         const t=this.sceneTime;for(let i=0;i<18;i++){const angle=i*2.399,x=160+Math.cos(angle)*(t*90+i*2),y=85+Math.sin(angle)*(t*65+i);a.rect(x,y,2,1,i%2?'#d57caa':'#c64a67');}
         if(!this.reduced)a.intrusion(this.time,false,.4);
         a.box(37,117,246,49,'#c27c9b','#190d1fea');a.text('「いやだ……声が、止まらない……！」',160,130,'#f3d0db',8,'center');a.text('地雷が爆発した',160,149,'#c997ab',6,'center');
       }else{
-        c.globalAlpha=.6;a.rect(0,0,320,180,'#0a0812');c.globalAlpha=1;a.text('GAME OVER',160,48,'#f1d2dc',20,'center');a.text('患者がパニックに陥った。',160,86,'#dfb3c9',9,'center');a.text('一度、呼吸を整えてから。',160,105,'#bba5bb',7,'center');a.text('ENTER / R もう一度    ESC タイトルへ',160,145,'#d2bd9d',6,'center');
+        a.rect(0,0,320,38,'#100c1a80');a.text('GAME OVER',12,12,'#f1d2dc',17);a.rect(0,127,320,53,'#100c1ad9');a.text('上司の声が響き、患者がパニックに陥った。',12,133,'#dfb3c9',8);a.text('一度、呼吸を整えてから。',12,147,'#bba5bb',7);a.text('ENTER / R もう一度    ESC タイトルへ',12,166,'#d2bd9d',6);
       }
       c.restore();
     }

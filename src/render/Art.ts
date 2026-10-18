@@ -123,6 +123,13 @@ export class Art {
     for(const [x,y] of [[225,91],[106,146]]){this.rect(x,y,8,15,'#702b75');this.rect(x+1,y+1,6,13,'#cf5187');this.rect(x+5,y+8,1,1,'#f8c8b3');}
     if(boss)this.boss(264,28,t);
   }
+  /** The reprimand scene from the original four-panel illustration sheet. */
+  reprimand() {
+    if(this.novel.draw(this.c,'scenes',0,0,320,180,3))return;
+    this.rect(0,0,320,180,'#161728');this.rect(12,23,296,91,'#252b40');
+    this.seatedPatient(117,86,.9);this.boss(243,47,0);
+    this.rect(52,128,244,9,'#655063');this.rect(61,137,6,43,'#241c30');this.rect(279,137,6,43,'#241c30');
+  }
   boss(x:number,y:number,t:number) {
     if(this.novel.get('scenes')){
       this.c.save();this.c.globalAlpha=.86+Math.sin(t*1.5)*.08;this.box(x-23,y-7,64,45,'#b16593','#110d21');this.novel.draw(this.c,'scenes',x-22,y-6,62,43,3);this.c.globalAlpha=.14;this.rect(x-22,y-6,62,43,'#ea3e9a');this.c.restore();return;
