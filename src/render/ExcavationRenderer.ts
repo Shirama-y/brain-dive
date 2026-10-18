@@ -6,12 +6,12 @@ export const MAP={x:111,y:25,cell:10,width:100,height:120};
 export class ExcavationRenderer {
  draw(a:Art,b:ExcavationBoard,time:number,reduced:boolean,effects:ExcavationEffects){
  const c=a.c;a.brain(time,reduced,false);a.rect(0,0,320,180,b.depth<4?'#09183855':b.depth<8?'#39133555':'#24061577');
- a.rect(3,7,101,155,'#080c17e8');a.rect(218,7,99,155,'#080c17ed');
+ a.rect(3,7,79,155,'#080c17d6');a.rect(218,7,99,155,'#080c17ed');
  a.text('CASE 01 / EXCAVATION',9,14,'#b0a6bf',5);a.text('月曜の朝',9,25,'#eee0d5',9);
  a.text(b.depth<3?'表層 / 感情の輪郭':b.depth<8?'中層 / 日常の記憶':'深層 / 声の出どころ',9,43,'#c99abb',6);
  a.text(`記憶 ${b.memories.size} / 3`,9,60,'#e9cc96',8);a.text('集中力 / カウンセラー',9,78,'#ae9cac',5);
- for(let i=0;i<6;i++)a.box(9+i*13,89,10,6,i<b.focus?'#b6b8df':'#3b354b',i<b.focus?'#7469ab':'#131221');
- a.text(`${b.focus} / 6`,9,101,'#d8d2e4',7);a.wrapped(b.focus?'光の縁を選んで掘る。\n通路は残ります。':'問診で集中力を回復。\n探索はいつでも再開。',9,117,88,'#a69aae',6,10);
+ for(let i=0;i<6;i++)a.box(9+i*11,89,8,6,i<b.focus?'#b6b8df':'#3b354b',i<b.focus?'#7469ab':'#131221');
+ a.text(`${b.focus} / 6`,9,101,'#d8d2e4',7);a.wrapped(b.focus?'光の縁を選んで掘る。\n通路は残ります。':'問診で集中力を回復。\n探索はいつでも再開。',9,117,73,'#a69aae',6,10);
  a.text(`探索 ${b.excavated.length} マス`,9,147,'#81748d',5);
  a.box(109,23,104,124,'#6d5878','#0a0d19');
  for(const t of b.tiles.flat()){
